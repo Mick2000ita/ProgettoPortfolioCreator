@@ -13,7 +13,7 @@ export class GoogleLoginComponent implements AfterViewInit {
 
   ngAfterViewInit(): void {
     google.accounts.id.initialize({
-      client_id: 'GOOGLE_CLIENT_ID.apps.googleusercontent.com',
+      client_id: '707290238106-bu0h2h60r609ib3k2ia53cr0cbaaofer.apps.googleusercontent.com',
       callback: (response: any) => this.login(response.credential)
     });
 
