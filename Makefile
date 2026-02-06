@@ -44,3 +44,6 @@ start: create-shopfloor-network
 ##stop: @ Ferma l'applicazione
 stop:
 	docker compose down
+
+##restart: @ Riavvia l'applicazione
+restart: stop start
