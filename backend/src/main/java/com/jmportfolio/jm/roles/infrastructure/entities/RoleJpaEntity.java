@@ -26,12 +26,12 @@ import lombok.ToString;
 @NoArgsConstructor
 @Builder
 public class RoleJpaEntity extends BaseJpaEntity{
-    @Column
+    @Column(unique = true, nullable = false)
     private String code;
 
     @Column
     private String description;
 
-    @OneToMany(mappedBy = "roleId")
+    @OneToMany(mappedBy = "role")
     private List<UserJpaEntity> users;
 }

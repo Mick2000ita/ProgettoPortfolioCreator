@@ -26,7 +26,7 @@ import lombok.ToString;
 @NoArgsConstructor
 @Builder
 public class UserJpaEntity extends BaseJpaEntity {
-    @Column
+    @Column(unique = true, nullable = false)
     private String email;
 
     @Column
