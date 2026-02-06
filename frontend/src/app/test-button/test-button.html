@@ -1,0 +1,9 @@
+<div style="padding: 20px;">
+  <button (click)="runTest()">Lancia Test BE</button>
+  @if(result) {
+    <div style="margin-top: 20px;">
+      <p>Status: {{result.status}}</p>
+      <p>Message: {{result.message}}</p>
+    </div>
+  }
+</div>
