@@ -1,0 +1,47 @@
+# ======================
+# ENVIRONMENT
+# ======================
+.env
+.env.*   # qualsiasi altro file di ambiente
+
+# ======================
+# NODE / Angular
+# ======================
+node_modules/
+dist/
+out-tsc/
+.angular/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Build / Temp
+tmp/
+temp/
+*.tsbuildinfo
+
+# IDE / Editor
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# ======================
+# Spring Boot / Maven
+# ======================
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+.mvn/
+.mvn/wrapper/maven-wrapper.jar
+
+# Logs
+*.log
+hs_err_pid*
+logs/
