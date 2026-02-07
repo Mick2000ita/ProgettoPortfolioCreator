@@ -1,9 +1,11 @@
 package com.jmportfolio.jm.domains.users.domain.models;
 
+import java.util.List;
 import java.util.UUID;
 
 import com.jmportfolio.jm.domains.portfolios.domain.models.Portfolio;
 import com.jmportfolio.jm.domains.roles.domain.model.Role;
+import com.jmportfolio.jm.domains.usertemplates.domain.models.UserTemplate;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -21,4 +23,5 @@ public class User {
     private String avatarUrl;
     private Role role;
     private Portfolio portfolio;
+    private List<UserTemplate> templates;
 }

@@ -1,4 +1,4 @@
-package com.jmportfolio.jm.domains.apptemplate.infrastructure.entities;
+package com.jmportfolio.jm.domains.apptemplates.infrastructure.entities;
 
 import java.util.List;
 

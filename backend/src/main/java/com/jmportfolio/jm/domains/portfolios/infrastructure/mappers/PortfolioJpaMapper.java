@@ -2,7 +2,7 @@ package com.jmportfolio.jm.domains.portfolios.infrastructure.mappers;
 
 import com.jmportfolio.jm.domains.portfolios.domain.models.Portfolio;
 import com.jmportfolio.jm.domains.portfolios.infrastructure.entities.PortfolioJpaEntity;
-import com.jmportfolio.jm.domains.users.infrastructure.entities.mappers.UserJpaMapper;
+import com.jmportfolio.jm.domains.users.infrastructure.mappers.UserJpaMapper;
 
 public class PortfolioJpaMapper {
     public static Portfolio entityToModel(PortfolioJpaEntity entity) {

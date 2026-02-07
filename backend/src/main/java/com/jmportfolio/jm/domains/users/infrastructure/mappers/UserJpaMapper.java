@@ -1,9 +1,10 @@
-package com.jmportfolio.jm.domains.users.infrastructure.entities.mappers;
+package com.jmportfolio.jm.domains.users.infrastructure.mappers;
 
 import com.jmportfolio.jm.domains.portfolios.infrastructure.mappers.PortfolioJpaMapper;
 import com.jmportfolio.jm.domains.roles.infrastructure.mappers.RoleJpaMapper;
 import com.jmportfolio.jm.domains.users.domain.models.User;
 import com.jmportfolio.jm.domains.users.infrastructure.entities.UserJpaEntity;
+import com.jmportfolio.jm.domains.usertemplates.infrastructure.mappers.UserTemplateJpaMapper;
 
 public class UserJpaMapper {
     public static User entityToModel(UserJpaEntity entity) {
@@ -18,6 +19,7 @@ public class UserJpaMapper {
         model.setAvatarUrl(entity.getAvatarUrl());
         model.setRole(RoleJpaMapper.entityToModel(entity.getRole()));
         model.setPortfolio(PortfolioJpaMapper.entityToModel(entity.getPortfolio()));
+        model.setTemplates(UserTemplateJpaMapper.entityToModel(entity.getTemplates()));
         return model;
     }
 }

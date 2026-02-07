@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.jmportfolio.jm.domains.users.domain.models.User;
-import com.jmportfolio.jm.domains.users.infrastructure.entities.mappers.UserJpaMapper;
+import com.jmportfolio.jm.domains.users.infrastructure.mappers.UserJpaMapper;
 import com.jmportfolio.jm.domains.users.infrastructure.repo.UserJpaRepo;
 
 @Component

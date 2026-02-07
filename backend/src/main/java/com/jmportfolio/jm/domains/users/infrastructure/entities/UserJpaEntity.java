@@ -1,16 +1,19 @@
 package com.jmportfolio.jm.domains.users.infrastructure.entities;
 
 import java.sql.Timestamp;
+import java.util.List;
 
 import com.jmportfolio.jm.core.BaseJpaEntity;
 import com.jmportfolio.jm.domains.portfolios.infrastructure.entities.PortfolioJpaEntity;
 import com.jmportfolio.jm.domains.roles.infrastructure.entities.RoleJpaEntity;
+import com.jmportfolio.jm.domains.usertemplates.infrastructure.entities.UserTemplateJpaEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -43,6 +46,9 @@ public class UserJpaEntity extends BaseJpaEntity {
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     private RoleJpaEntity role;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    private List<UserTemplateJpaEntity> templates;
 
     @OneToOne(mappedBy = "userJpaEntity", fetch = FetchType.LAZY)
     @JoinColumn(name = "portfolio_id", referencedColumnName = "id")
