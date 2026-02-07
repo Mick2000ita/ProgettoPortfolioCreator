@@ -57,6 +57,8 @@ CREATE TABLE projects (
   app_template_id uuid,
   user_template_id uuid,
   name varchar,
+  is_active boolean,
+  data json,
   position integer NOT NULL
 );
 

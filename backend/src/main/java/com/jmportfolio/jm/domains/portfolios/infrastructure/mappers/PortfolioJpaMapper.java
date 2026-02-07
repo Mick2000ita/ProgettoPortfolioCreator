@@ -20,4 +20,20 @@ public class PortfolioJpaMapper {
         model.setUser(UserJpaMapper.entityToModel(entity.getUserJpaEntity()));
         return model;
     }
+
+    public static PortfolioJpaEntity modelToEntity(Portfolio model) {
+        if (model == null) {
+            return null;
+        }
+
+        PortfolioJpaEntity entity = new PortfolioJpaEntity();
+        entity.setId(model.getId());
+        entity.setTitle(model.getTitle());
+        entity.setSlug(model.getSlug());
+        entity.setPublicData(model.getPublicData());
+        entity.setWipData(model.getWipData());
+        entity.setPublic(model.isPublic());
+        entity.setUserJpaEntity(UserJpaMapper.modelToEntity(model.getUser()));
+        return entity;
+    }
 }

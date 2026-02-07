@@ -15,4 +15,16 @@ public class RoleJpaMapper {
         model.setDescription(entity.getDescription());
         return model;
     }
+
+    public static RoleJpaEntity modelToEntity(Role model) {
+        if (model == null) return null;
+
+        RoleJpaEntity entity = new RoleJpaEntity();
+        if(model.getId() != null){
+            entity.setId(model.getId());
+        }
+        entity.setCode(model.getCode());
+        entity.setDescription(model.getDescription());
+        return entity;
+    }
 }

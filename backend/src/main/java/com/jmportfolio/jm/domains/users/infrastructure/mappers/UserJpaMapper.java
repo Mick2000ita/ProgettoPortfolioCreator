@@ -22,4 +22,20 @@ public class UserJpaMapper {
         model.setTemplates(UserTemplateJpaMapper.entityToModel(entity.getTemplates()));
         return model;
     }
+
+    public static UserJpaEntity modelToEntity(User model) {
+        if (model == null) return null;
+
+        UserJpaEntity entity = new UserJpaEntity();
+        if(model.getId() != null){
+            entity.setId(model.getId());
+        }
+        entity.setEmail(model.getEmail());
+        entity.setUsername(model.getUsername());
+        entity.setAvatarUrl(model.getAvatarUrl());
+        entity.setRole(RoleJpaMapper.modelToEntity(model.getRole()));
+        entity.setPortfolio(PortfolioJpaMapper.modelToEntity(model.getPortfolio()));
+        entity.setTemplates(UserTemplateJpaMapper.modelToEntity(model.getTemplates()));
+        return entity;
+    }
 }
