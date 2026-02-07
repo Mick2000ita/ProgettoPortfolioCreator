@@ -1,14 +1,17 @@
 package com.jmportfolio.jm.users.infrastructure.entities;
 
 import java.sql.Timestamp;
-import java.util.UUID;
 
 import com.jmportfolio.jm.core.BaseJpaEntity;
+import com.jmportfolio.jm.portfolios.infrastructure.entities.PortfolioJpaEntity;
 import com.jmportfolio.jm.roles.infrastructure.entities.RoleJpaEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -38,6 +41,10 @@ public class UserJpaEntity extends BaseJpaEntity {
     @Column(name="last_login")
     private Timestamp lastLogin;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     private RoleJpaEntity role;
+
+    @OneToOne(mappedBy = "userJpaEntity", fetch = FetchType.LAZY)
+    @JoinColumn(name = "portfolio_id", referencedColumnName = "id")
+    private PortfolioJpaEntity portfolio;
 }
