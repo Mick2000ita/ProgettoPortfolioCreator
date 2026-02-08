@@ -41,7 +41,7 @@ public class UserJpaEntity extends BaseJpaEntity {
     @Column(name = "avatar_url")
     private String avatarUrl;
 
-    @Column(name="last_login")
+    @Column(name = "last_login")
     private Timestamp lastLogin;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
@@ -51,6 +51,5 @@ public class UserJpaEntity extends BaseJpaEntity {
     private List<UserTemplateJpaEntity> templates;
 
     @OneToOne(mappedBy = "userJpaEntity", fetch = FetchType.LAZY)
-    @JoinColumn(name = "portfolio_id", referencedColumnName = "id")
     private PortfolioJpaEntity portfolio;
 }

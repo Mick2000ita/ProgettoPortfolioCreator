@@ -10,7 +10,6 @@ import com.jmportfolio.jm.core.BaseJpaEntity;
 import com.jmportfolio.jm.domains.users.infrastructure.entities.UserJpaEntity;
 
 import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -32,11 +31,11 @@ import lombok.ToString;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class PortfolioJpaEntity extends BaseJpaEntity{
-    @Column
+public class PortfolioJpaEntity extends BaseJpaEntity {
+    @Column(nullable = false)
     private String title;
 
-    @Column
+    @Column(nullable = false, unique = true)
     private String slug;
 
     @Type(JsonBinaryType.class)
@@ -52,7 +51,7 @@ public class PortfolioJpaEntity extends BaseJpaEntity{
     @Column(name = "is_public")
     private boolean isPublic;
 
-    @OneToOne(mappedBy = "portfolio", fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", referencedColumnName = "id")
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
     private UserJpaEntity userJpaEntity;
 }

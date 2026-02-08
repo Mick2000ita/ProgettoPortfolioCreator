@@ -10,5 +10,5 @@ import com.jmportfolio.jm.domains.usertemplates.infrastructure.entities.UserTemp
 
 public interface UserTemplateJpaRepo extends BaseRepository<UserTemplateJpaEntity, UUID> {
     @EntityGraph(attributePaths = {"user"})
-    Optional<UserTemplateJpaEntity> findByIdWithUser(UUID id);
+    Optional<UserTemplateJpaEntity> findById(UUID id);
 }

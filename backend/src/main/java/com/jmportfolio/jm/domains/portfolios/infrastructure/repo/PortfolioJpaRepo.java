@@ -11,5 +11,5 @@ import com.jmportfolio.jm.domains.portfolios.infrastructure.entities.PortfolioJp
 public interface PortfolioJpaRepo extends BaseRepository<PortfolioJpaEntity, UUID>{
     
     @EntityGraph(attributePaths = {"user"})
-    Optional<PortfolioJpaEntity> findByIdWithUser(UUID id);
+    Optional<PortfolioJpaEntity> findById(UUID id);
 }

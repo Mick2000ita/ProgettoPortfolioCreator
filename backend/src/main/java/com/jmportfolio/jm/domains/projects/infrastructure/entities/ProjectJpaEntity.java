@@ -37,7 +37,7 @@ public class ProjectJpaEntity extends BaseJpaEntity {
     @Column(name = "name")
     private String name;
 
-    @Column(name = "position")
+    @Column(name = "position", nullable = false)
     private Integer position;
 
     @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
@@ -49,14 +49,14 @@ public class ProjectJpaEntity extends BaseJpaEntity {
     private List<Object> data;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "portfolio_id", referencedColumnName = "id")
+    @JoinColumn(name = "portfolio_id")
     private PortfolioJpaEntity portfolio;
 
     @ManyToOne(optional = true, fetch = FetchType.LAZY)
-    @JoinColumn(name = "app_template_id", referencedColumnName = "id")
+    @JoinColumn(name = "app_template_id")
     private AppTemplateJpaEntity appTemplate;
 
     @ManyToOne(optional = true, fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_template_id", referencedColumnName = "id")
+    @JoinColumn(name = "user_template_id")
     private UserTemplateJpaEntity userTemplate;
 }
