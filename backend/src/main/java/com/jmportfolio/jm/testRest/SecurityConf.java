@@ -24,17 +24,20 @@ public class SecurityConf {
         };
     }
 
-    // Configurazione Security
+
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // disabilita CSRF per REST API
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/test/**").permitAll() // questa rotta senza login
-                        .anyRequest().authenticated() // tutte le altre richiedono login
+                        .requestMatchers("/api/test/**").permitAll()    // rotte di test
+                        .requestMatchers("/api/auth/google").permitAll() // il login con Google
+                        .anyRequest().authenticated()
                 )
-                .cors(cors -> {}); // abilita CORS con configurazione WebMvcConfigurer
+                .cors(cors -> {});
 
         return http.build();
     }
+
 }
