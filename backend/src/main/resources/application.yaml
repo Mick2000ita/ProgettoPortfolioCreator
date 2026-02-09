@@ -9,6 +9,7 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+    schemas: public
+    default-schema: public
     locations: classpath:db/migration
-google:
-  client-id: ${GOOGLE_CLIENT_ID}
+    baseline-on-migrate: true

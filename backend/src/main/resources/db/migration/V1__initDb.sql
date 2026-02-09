@@ -1,3 +1,4 @@
+CREATE SCHEMA IF NOT EXISTS public;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE roles (
@@ -57,6 +58,8 @@ CREATE TABLE projects (
   app_template_id uuid,
   user_template_id uuid,
   name varchar,
+  is_active boolean,
+  data json,
   position integer NOT NULL
 );
 
