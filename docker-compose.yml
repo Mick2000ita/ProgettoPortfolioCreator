@@ -26,6 +26,7 @@ services:
     networks: [app-net]
 
   frontend:
+    profiles: ["prod"]
     build: ./frontend
     ports:
       - "${FRONTEND_PORT}:80"

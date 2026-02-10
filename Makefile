@@ -39,7 +39,10 @@ code:
 
 ##start: @ Avvia l'applicazione
 start: create-shopfloor-network
-	docker compose up -d --build
+	docker compose -d --build --profile dev up
+
+start-prod: create-shopfloor-network
+	docker compose -d --build --profile prod up
 
 ##stop: @ Ferma l'applicazione
 stop:
