@@ -18,7 +18,7 @@ ifneq (,$(wildcard ./dev.env))
     export
 endif
 
-create-shopfloor-network:
+create-network:
 	docker network inspect shopfloor_local_network >/dev/null 2>&1 || docker network create --driver bridge shopfloor_local_network
 
 ##help: @ Mostra tutti i comandi di questo makefile
@@ -38,12 +38,15 @@ code:
 	code shopfloor.code-workspace
 
 ##start: @ Avvia l'applicazione
-start: create-shopfloor-network
-	docker compose up -d --build
+start: create-network
+	docker compose --profile dev up -d --build
+
+start-prod: create-network
+	docker compose --profile prod up -d --build
 
 ##stop: @ Ferma l'applicazione
 stop:
-	docker compose down
+	docker compose --profile dev down
 
 ##restart: @ Riavvia l'applicazione
 restart: stop start
