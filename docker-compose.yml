@@ -32,6 +32,19 @@ services:
     depends_on: [backend]
     networks: [app-net]
 
+  frontend-dev:
+    profiles: ["dev"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "4210:4210"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on: [backend]
+    networks: [app-net]
+
 networks:
   app-net:
 
