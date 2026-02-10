@@ -1,7 +1,11 @@
 @if (user == true) {
 <div class="center">
     <p-card class="shadow-6 border-round-xl" headerStyleClass="center-title" header="Portfolio Creator" ngSkipHydration>
-    <div class="flex flex-column align-items-center gap-3">     
+    <div class="flex flex-column align-items-center gap-3">  
+            <p-floatlabel>
+                <input id="username" pInputText ngModel="value" autocomplete="off" />
+                <label for="username">Username</label>
+            </p-floatlabel>
       <app-google-login ngSkipHydration></app-google-login>
       <app-test-button ngSkipHydration></app-test-button>
     </div>
