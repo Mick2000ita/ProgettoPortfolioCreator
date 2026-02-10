@@ -6,6 +6,25 @@
 .center-title {
   text-align: center;
 }
-.card-content-spacing {
+.content-spacing-vertical {
   margin-top: 1.5rem;
+}
+.content-spacing-horizontal {
+  margin-left: 1.5rem;
+  margin-right: 1.5rem;
+}
+
+.buttons-row {
+  display: flex;
+  width: 100%;          /* tutta la larghezza disponibile della card */
+  justify-content: space-between; /* Login a sinistra, Register a destra */
+}
+
+
+.center-title {
+  text-align: center;
+}
+.same-width-button {
+  width: 48%;           /* stessa larghezza per entrambi */
+  min-width: 100px;     /* larghezza minima per non diventare troppo piccoli */
 }

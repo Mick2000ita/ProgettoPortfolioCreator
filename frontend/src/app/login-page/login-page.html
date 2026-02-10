@@ -1,26 +1,32 @@
 @if (true) {
 <div class="center">
-    <p-card class="shadow-6 border-round-xl"  contentStyleClass="pt-4" headerStyleClass="center-title" header="Portfolio Creator" ngSkipHydration>
-    <div class="flex flex-column align-items-center gap-3">  
-            <div class="card-content-spacing">
-            
-            <p-floatlabel>
-                <input id="username" pInputText [ngModel]="user" autocomplete="on" />
-                <label for="username">Username</label>              
-            </p-floatlabel>
-            </div>
-            <div class="card-content-spacing">
-            <p-floatlabel>
-                <input id="password" pInputText  [ngModel]="password" type="password" autocomplete="on" />
-                <label for="password">Password</label>              
-            </p-floatlabel>
-            </div>
-             <div class="center-title card-content-spacing">
-              
-            </div>
-            <div class="card-content-spacing">
-              <app-google-login ngSkipHydration></app-google-login>
-            </div>
+  <p-card class="shadow-6 border-round-xl center-title" contentStyleClass="pt-4" headerStyleClass="center-title"
+    header="Portfolio Creator" ngSkipHydration>
+    <div class="flex flex-column align-items-center gap-3">
+      <div class="content-spacing-vertical">
+        <p-floatlabel>
+          <input id="username" pInputText [ngModel]="user" autocomplete="on" />
+          <label for="username">Username</label>
+        </p-floatlabel>
+      </div>
+      <div class="content-spacing-vertical">
+        <p-floatlabel>
+          <input id="password" pInputText [ngModel]="password" type="password" autocomplete="on" />
+          <label for="password">Password</label>
+        </p-floatlabel>
+      </div>
+      <div class="center-title content-spacing-vertical">
+        <div class="content-spacing-vertical">
+          <div class="buttons-row">
+            <p-button label="Login" severity="success"></p-button>
+            <p-button label="Register" severity="danger"></p-button>
+          </div>
+        </div>
+        <div style="margin-top: 0.5rem">or</div>
+      </div>
+      <div class="content-spacing-vertical">
+        <app-google-login ngSkipHydration></app-google-login>
+      </div>
     </div>
   </p-card>
 

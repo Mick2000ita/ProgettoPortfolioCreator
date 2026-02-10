@@ -5,10 +5,11 @@ import { FloatLabelModule } from 'primeng/floatlabel';
 import { PasswordModule } from 'primeng/password';
 import { FormsModule } from '@angular/forms';
 import { InputTextModule } from 'primeng/inputtext';
+import { ButtonModule } from 'primeng/button';
 
 @Component({
   selector: 'app-login-page',
-  imports: [ GoogleLoginComponent, CardModule, FloatLabelModule, PasswordModule, FormsModule, InputTextModule],
+  imports: [ GoogleLoginComponent, CardModule, FloatLabelModule, PasswordModule, FormsModule, InputTextModule, ButtonModule],
   templateUrl: './login-page.html',
   styleUrl: './login-page.scss',
 })
