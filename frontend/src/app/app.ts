@@ -1,12 +1,12 @@
 import { NgIf } from '@angular/common';
 import { Component, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { TestButtonComponent } from "./test-button/test-button.component";
-import { GoogleLoginComponent } from "./google-login-component/google-login-component";
+
+import { LoginPage } from "./login-page/login-page";
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, TestButtonComponent, GoogleLoginComponent],  
+  imports: [RouterOutlet, LoginPage],  
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })

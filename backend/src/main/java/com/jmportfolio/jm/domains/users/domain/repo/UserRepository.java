@@ -11,10 +11,24 @@ import com.jmportfolio.jm.domains.users.infrastructure.repo.UserJpaRepo;
 
 @Component
 public class UserRepository {
+
     @Autowired
     private UserJpaRepo userJpaRepo;
 
+
     public User findById(UUID id) {
         return UserJpaMapper.entityToModel(userJpaRepo.findById(id).orElse(null));
+    }
+
+
+    public User findByEmail(String email) {
+        return userJpaRepo.findByEmail(email)
+                .map(UserJpaMapper::entityToModel)
+                .orElse(null);
+    }
+
+    public User save(User user) {
+        var entity = UserJpaMapper.modelToEntity(user);
+        return UserJpaMapper.entityToModel(userJpaRepo.save(entity));
     }
 }
