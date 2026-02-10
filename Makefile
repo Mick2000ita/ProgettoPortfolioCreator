@@ -46,7 +46,7 @@ start-prod: create-shopfloor-network
 
 ##stop: @ Ferma l'applicazione
 stop:
-	docker compose down
+	docker compose --profile dev down
 
 ##restart: @ Riavvia l'applicazione
 restart: stop start
