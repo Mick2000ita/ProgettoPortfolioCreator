@@ -1,14 +1,29 @@
-@if (user == true) {
+@if (true) {
 <div class="center">
-    <p-card class="shadow-6 border-round-xl" headerStyleClass="center-title" header="Portfolio Creator" ngSkipHydration>
+    <p-card class="shadow-6 border-round-xl"  contentStyleClass="pt-4" headerStyleClass="center-title" header="Portfolio Creator" ngSkipHydration>
     <div class="flex flex-column align-items-center gap-3">  
+            <div class="card-content-spacing">
+            
             <p-floatlabel>
-                <input id="username" pInputText ngModel="value" autocomplete="off" />
-                <label for="username">Username</label>
+                <input id="username" pInputText [ngModel]="user" autocomplete="on" />
+                <label for="username">Username</label>              
             </p-floatlabel>
-      <app-google-login ngSkipHydration></app-google-login>
-      <app-test-button ngSkipHydration></app-test-button>
+            </div>
+            <div class="card-content-spacing">
+            <p-floatlabel>
+                <input id="password" pInputText  [ngModel]="password" type="password" autocomplete="on" />
+                <label for="password">Password</label>              
+            </p-floatlabel>
+            </div>
+             <div class="center-title card-content-spacing">
+              
+            </div>
+            <div class="card-content-spacing">
+              <app-google-login ngSkipHydration></app-google-login>
+            </div>
     </div>
   </p-card>
+
+ 
 </div>
 }
