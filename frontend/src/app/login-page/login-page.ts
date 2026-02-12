@@ -14,10 +14,19 @@ import { ButtonModule } from 'primeng/button';
   styleUrl: './login-page.scss',
 })
 export class LoginPage {
+registerUser() {
+throw new Error('Method not implemented.');
+}
 
 
-
-  user: string | undefined;
+  user: string | undefined; 
   password: string | undefined;
+  email: any;
+  registrationFormVisible: boolean = false;
+
+  openRegisterForm() {
+    this.registrationFormVisible = !this.registrationFormVisible;
+  }
+
 
 }
