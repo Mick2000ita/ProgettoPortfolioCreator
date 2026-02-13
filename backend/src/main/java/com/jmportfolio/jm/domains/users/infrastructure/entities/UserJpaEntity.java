@@ -11,7 +11,6 @@ import com.jmportfolio.jm.domains.usertemplates.infrastructure.entities.UserTemp
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
@@ -37,6 +36,9 @@ public class UserJpaEntity extends BaseJpaEntity {
 
     @Column
     private String username;
+
+    @Column
+    private String password;
 
     @Column(name = "avatar_url")
     private String avatarUrl;
