@@ -1,6 +1,5 @@
 package com.jmportfolio.jm.core.exceptions;
 
-
 import java.security.SignatureException;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -31,15 +30,15 @@ import jakarta.validation.ConstraintViolationException;
 @Slf4j
 class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    @ExceptionHandler(value = {ResponseStatusException.class})
+    @ExceptionHandler(value = { ResponseStatusException.class })
     public ResponseEntity<Object> handleNotFoundException(ResponseStatusException ex) {
         log.error(ex.getMessage(), ex);
         return new ResponseEntity<Object>(
-                new ExceptionResponseDto(ex.getMessage(), BaseErrorCode.DEFAULT),
+                new ExceptionResponseDto(ex.getReason(), BaseErrorCode.DEFAULT),
                 ex.getStatusCode());
     }
 
-    @ExceptionHandler(value = {NoSuchElementException.class})
+    @ExceptionHandler(value = { NoSuchElementException.class })
     public ResponseEntity<Object> handleNoSuchElementException(NoSuchElementException ex) {
         log.error("NoSuchElementException Exception: {}", ex);
         return new ResponseEntity<Object>(
@@ -47,7 +46,7 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.NOT_FOUND);
     }
 
-    @ExceptionHandler(value = {Unauthorized.class})
+    @ExceptionHandler(value = { Unauthorized.class })
     public ResponseEntity<Object> handleUnauthorizedException(Unauthorized ex) {
         log.error("Unauthorized Exception: {}", ex.getMessage());
         return new ResponseEntity<Object>(
@@ -55,7 +54,7 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.UNAUTHORIZED);
     }
 
-    @ExceptionHandler(value = {AccessDeniedException.class})
+    @ExceptionHandler(value = { AccessDeniedException.class })
     public ResponseEntity<Object> handleAccessDeniedExceptionException(AccessDeniedException ex) {
         log.error("AccessDeniedException Exception: {}", ex.getMessage());
         return new ResponseEntity<Object>(
@@ -63,7 +62,7 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.UNAUTHORIZED);
     }
 
-    @ExceptionHandler(value = {Forbidden.class})
+    @ExceptionHandler(value = { Forbidden.class })
     public ResponseEntity<Object> handleForbiddenException(Forbidden ex) {
         log.error("Forbidden Exception: {}", ex.getMessage());
         return new ResponseEntity<Object>(
@@ -71,15 +70,19 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.FORBIDDEN);
     }
 
-    @ExceptionHandler(value = {ApplicationException.class})
+    @ExceptionHandler(ApplicationException.class)
     public ResponseEntity<Object> handleApplicationException(ApplicationException ex) {
-        log.error("Application Exception: Message: {} Code: {}", ex.getMessage(), ex.getCode());
-        return new ResponseEntity<Object>(
-                new ExceptionResponseDto(ex.getMessage(), ex.getCode(), ex.getParams()),
-                HttpStatus.INTERNAL_SERVER_ERROR);
+        log.error("Application Exception: {}", ex.getMessage());
+
+        return new ResponseEntity<>(
+                new ExceptionResponseDto(
+                        ex.getMessage(),
+                        ex.getCode(),
+                        ex.getParams()),
+                ex.getHttpStatus());
     }
 
-    @ExceptionHandler(value = {SignatureException.class})
+    @ExceptionHandler(value = { SignatureException.class })
     public ResponseEntity<Object> handleSignatureException(SignatureException ex) {
         log.error("Signature Exception: {}", ex.getMessage());
         return new ResponseEntity<Object>(
@@ -87,7 +90,7 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.UNAUTHORIZED);
     }
 
-    @ExceptionHandler(value = {InternalAuthenticationServiceException.class})
+    @ExceptionHandler(value = { InternalAuthenticationServiceException.class })
     public ResponseEntity<Object> handleInternalAuthenticationServiceException(
             InternalAuthenticationServiceException ex) {
         log.error("InternalAuthenticationServiceException: Message: {}", ex.getMessage());
@@ -96,7 +99,7 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    @ExceptionHandler(value = {ConstraintViolationException.class})
+    @ExceptionHandler(value = { ConstraintViolationException.class })
     public ResponseEntity<Object> handleValidationException(ConstraintViolationException ex) {
         log.error("Validation Exception: {}", ex.getMessage());
         return new ResponseEntity<Object>(
@@ -104,7 +107,7 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(value = {ClientAbortException.class})
+    @ExceptionHandler(value = { ClientAbortException.class })
     public ResponseEntity<Object> handleBrokenPipeException(ClientAbortException ex) {
         log.info("broken pipe");
         return new ResponseEntity<Object>(

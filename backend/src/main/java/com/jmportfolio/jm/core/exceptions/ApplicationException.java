@@ -1,68 +1,45 @@
 package com.jmportfolio.jm.core.exceptions;
 
+
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.web.client.HttpClientErrorException;
 
 import lombok.Getter;
 import net.minidev.json.JSONObject;
 
-public class ApplicationException extends HttpClientErrorException {
+public class ApplicationException extends RuntimeException {
 
     @Getter
-    private String code;
+    private final String code;
 
     @Getter
-    private JSONObject params;
+    private final JSONObject params;
 
-    /**
-     * exception.
-     *
-     * @param message internal message
-     * @param code used for translate the message
-     */
-    public ApplicationException(String message, String code, Map<String, String> params) {
-        super(HttpStatus.INTERNAL_SERVER_ERROR, message);
-        this.code = code;
-        JSONObject paramsObj = null;
-        if (params != null) {
-            paramsObj = new JSONObject(params);
-        }
-        this.params = paramsObj;
-    }
+    @Getter
+    private final HttpStatus httpStatus;
 
-    /**
-     * exception.
-     *
-     * @param message internal message
-     * @param code used for translate the message
-     */
-    public ApplicationException(String message, String code, JSONObject params) {
-        super(HttpStatus.INTERNAL_SERVER_ERROR, message);
-        this.code = code;
-        JSONObject paramsObj = null;
-        if (params != null) {
-            paramsObj = new JSONObject(params);
-        }
-        this.params = paramsObj;
-    }
-
-    /**
-     * exception.
-     *
-     * @param message internal message
-     * @param code used for translate the message
-     */
     public ApplicationException(String message, String code) {
-        super(HttpStatus.INTERNAL_SERVER_ERROR, message);
-        this.code = code;
-        this.params = null;
+        this(message, code, null, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    public ApplicationException(String message, String code, HttpStatus httpStatus) {
-        super(httpStatus, message);
+    public ApplicationException(String message, String code, Map<String, String> params) {
+        this(message, code, new JSONObject(params), HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    public ApplicationException(String message, String code, HttpStatus status) {
+        this(message, code, null, status);
+    }
+
+    public ApplicationException(
+            String message,
+            String code,
+            JSONObject params,
+            HttpStatus status
+    ) {
+        super(message); // <-- CLEAN MESSAGE
         this.code = code;
-        this.params = null;
+        this.params = params;
+        this.httpStatus = status;
     }
 }
