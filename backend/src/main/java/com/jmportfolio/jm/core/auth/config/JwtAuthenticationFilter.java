@@ -45,10 +45,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 username = tokenUtil.getUsernameFromToken(authToken);
             } catch (JwtException e) {
-                log.error("JWT token is invalid: {}", e.getMessage());
-                // if invalid jwt
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT token");
+                log.error("JWT token is invalid", e);
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
                 return;
             }
         }
