@@ -46,7 +46,7 @@ public class SecurityConf {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll() // il login con Google
+                        .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated())
                 .cors(cors -> {
                 })
