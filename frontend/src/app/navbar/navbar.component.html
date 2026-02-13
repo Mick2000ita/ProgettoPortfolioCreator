@@ -1,0 +1,12 @@
+<div class="card">
+    <p-menubar [model]="items">
+        <ng-template #start>
+            <h3>{{ userData?.username }}</h3>
+        </ng-template>
+        <ng-template #end>
+            <div class="flex items-center gap-2">
+                <p-avatar [image]="userData?.avatarUrl" shape="circle" />
+            </div>
+        </ng-template>
+    </p-menubar>
+</div>
