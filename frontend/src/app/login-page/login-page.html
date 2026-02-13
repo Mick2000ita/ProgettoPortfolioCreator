@@ -1,10 +1,66 @@
-@if (user == true) {
+@if (true) {
 <div class="center">
-    <p-card class="shadow-6 border-round-xl" headerStyleClass="center-title" header="Portfolio Creator" ngSkipHydration>
-    <div class="flex flex-column align-items-center gap-3">     
-      <app-google-login ngSkipHydration></app-google-login>
-      <app-test-button ngSkipHydration></app-test-button>
+  <p-card class="shadow-6 border-round-xl center-title card-color" contentStyleClass="pt-4 "  ngSkipHydration>
+<ng-template #header>
+  <div class="card-header">
+
+    <div class="header-slot">
+      @if (registrationFormVisible) {
+        <p-button icon="pi pi-arrow-left" [outlined]="true" severity="success" (onClick)="openRegisterForm()"></p-button>
+      }
+    </div>
+    <div class="header-title">
+      Portfolio Creator
+    </div>
+    <div class="header-slot"></div>
+
+  </div>
+</ng-template>
+ 
+    <div class="flex flex-column align-items-center gap-3">
+      <div class="content-spacing-vertical">
+        <p-floatlabel>
+          <input id="username" pInputText [ngModel]="user" autocomplete="on" />
+          <label for="username">Username</label>
+        </p-floatlabel>
+      </div>
+      @if(registrationFormVisible){
+        <div class="content-spacing-vertical">
+          <p-floatlabel>
+            <input id="email" pInputText [ngModel]="email" type="email" autocomplete="on" />
+            <label for="email">Email</label>
+          </p-floatlabel>
+        </div>
+      }
+      <div class="content-spacing-vertical">
+        <p-floatlabel>
+          <input id="password" pInputText [ngModel]="password" type="password" autocomplete="on" />
+          <label for="password">Password</label>
+        </p-floatlabel>
+      </div>
+      <div class="center-title content-spacing-vertical">
+        <div class="content-spacing-vertical">
+            @if (!registrationFormVisible) {
+          <div class="buttons-row">   
+            <p-button label="Login"  severity="success"></p-button>
+            <p-button label="Register"  (onClick)="openRegisterForm()" severity="danger"></p-button>
+          </div>
+           }
+           @if (registrationFormVisible) {
+          <div class="button-container">
+        <p-button label="Register" severity="danger" [raised]="true" styleClass="full-width-btn" (onClick)="registerUser()">
+            </p-button>
+          </div>
+            
+           }          
+        </div>
+        <div style="margin-top: 0.5rem">or</div>
+      </div>
+      <div class="content-spacing-vertical">
+        <app-google-login ngSkipHydration></app-google-login>
+      </div>
     </div>
   </p-card>
+
 </div>
 }
