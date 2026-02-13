@@ -39,36 +39,46 @@ ngOnInit() {
 }
 
 registerUser() {
-  // rimuove eventuale toast precedente
-  this.messageService.clear('registerToast');
+  const errors: string[] = [];
+
+  if (!this.user) {
+    errors.push('Inserisci il nome utente');
+  }
+
+  if (!this.email) {
+    errors.push('Inserisci l\'email');
+  } else {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(this.email)) {
+      errors.push('Email non valida');
+    }
+  }
 
   if (!this.password || !this.confirmPassword) {
-     this.messageService.add({ 
-       key: 'registerToast',
-       severity: 'warn', 
-       summary: 'Warning', 
-       detail: 'Inserisci entrambe le password' 
-     });
+    errors.push('Inserisci entrambe le password');
+  } else if (this.password !== this.confirmPassword) {
+    errors.push('Le password non corrispondono');
+  }
+
+  this.messageService.clear('registerToast');
+
+  if (errors.length > 0) {
+    this.messageService.add({
+      key: 'registerToast',
+      severity: 'warn',
+      summary: 'Warning',
+      detail: errors.join(', ')
+    });
     return;
   }
 
-  if (this.password !== this.confirmPassword) {
-     this.messageService.add({ 
-       key: 'registerToast',
-       severity: 'warn', 
-       summary: 'Warning', 
-       detail: 'Le password non corrispondono' 
-     });
-    return;
-  }
-
-  this.messageService.add({ 
+  this.messageService.add({
     key: 'registerToast',
-    severity: 'success', 
-    summary: 'Success', 
+    severity: 'success',
+    summary: 'Success',
     detail: 'Registrazione avvenuta con successo'
   });
-} 
+}
   openRegisterForm() {
     this.registrationFormVisible = !this.registrationFormVisible;
   }
