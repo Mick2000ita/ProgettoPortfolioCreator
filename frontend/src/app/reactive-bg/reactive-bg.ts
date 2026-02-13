@@ -2,8 +2,7 @@ import {
   Component,
   ElementRef,
   ViewChild,
-  HostListener,
-  AfterViewInit
+  HostListener
 } from '@angular/core';
 
 interface Hex {
@@ -19,7 +18,7 @@ interface Wave {
   radius: number;
   baseStrength: number;
   age: number;
-   life: number;
+  life: number;
 }
 
 @Component({
@@ -27,7 +26,7 @@ interface Wave {
   templateUrl: './reactive-bg.html',
   styleUrls: ['./reactive-bg.scss'],
 })
-export class ReactiveBg implements AfterViewInit {
+export class ReactiveBg {
 
   @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
   ctx!: CanvasRenderingContext2D;
@@ -37,14 +36,13 @@ export class ReactiveBg implements AfterViewInit {
 
   hexRadius = 16;
   stroke = 1;
-  timeBetweenWaves = 1800; 
-  
+  timeBetweenWaves = 1800;
 
-  ngAfterViewInit() {
+  @HostListener('window:load')
+  onLoad() {
     this.resize();
     this.createHexGrid();
     this.animate();
-
     setInterval(() => this.spawnWave(), this.timeBetweenWaves);
   }
 
@@ -76,24 +74,24 @@ export class ReactiveBg implements AfterViewInit {
     }
   }
 
-spawnWave() {
-  const c = this.canvasRef.nativeElement;
-  this.waves.push({
-    x: Math.random() * c.width,
-    y: Math.random() * c.height,
-    radius: 0,
-    baseStrength: 22,
-    age: 0,
-    life: 240
-  });
-}
+  spawnWave() {
+    const c = this.canvasRef.nativeElement;
+    this.waves.push({
+      x: Math.random() * c.width,
+      y: Math.random() * c.height,
+      radius: 0,
+      baseStrength: 22,
+      age: 0,
+      life: 240
+    });
+  }
 
   drawHex(x: number, y: number, r: number) {
     const ctx = this.ctx;
     ctx.beginPath();
 
     for (let i = 0; i < 6; i++) {
-      const angle = Math.PI / 3 * i + Math.PI / 6; // rotazione 30° per honeycomb
+      const angle = Math.PI / 3 * i + Math.PI / 6;
       const px = x + Math.cos(angle) * r;
       const py = y + Math.sin(angle) * r;
       i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
@@ -107,18 +105,15 @@ spawnWave() {
     const c = this.canvasRef.nativeElement;
     this.ctx.clearRect(0, 0, c.width, c.height);
 
-this.waves.forEach(w => {
-  w.radius += 1.1;
-  w.age += 1;
-});
+    this.waves.forEach(w => {
+      w.radius += 1.1;
+      w.age += 1;
+    });
 
-// rimuovi onde scadute
-this.waves = this.waves.filter(w => w.age <= w.life);
+    // rimuovi onde scadute
+    this.waves = this.waves.filter(w => w.age <= w.life && w.radius < 800);
 
-    // rimuovi onde troppo grandi
-    this.waves = this.waves.filter(w => w.radius < 800);
-
-    this.ctx.strokeStyle = '#1E7F4D';
+    this.ctx.strokeStyle = '#005B41';
     this.ctx.lineWidth = this.stroke;
     this.ctx.lineJoin = 'round';
     this.ctx.lineCap = 'round';
@@ -132,21 +127,19 @@ this.waves = this.waves.filter(w => w.age <= w.life);
         const dy = h.oy - w.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const diff = Math.abs(dist - w.radius);
-        
 
         if (diff < 18) {
-          // smoothstep fade-in
           const t = Math.min(1, w.age / 40);
-          const fade = 1 - Math.min(1, w.age / w.life); // decrescita finale
+          const fade = 1 - Math.min(1, w.age / w.life);
           const smooth = t * t * (3 - 2 * t);
-          const strength = w.baseStrength * smooth * fade;         
+          const strength = w.baseStrength * smooth * fade;
+
           const force = (1 - diff / 18) * strength;
           offsetX += (dx / dist) * force;
           offsetY += (dy / dist) * force;
         }
       }
 
-      // interpolazione verso la posizione target
       h.x += (h.ox + offsetX - h.x) * 0.07;
       h.y += (h.oy + offsetY - h.y) * 0.07;
 

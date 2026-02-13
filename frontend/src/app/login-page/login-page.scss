@@ -7,15 +7,20 @@
   text-align: center;
 }
 .content-spacing-vertical {
-  margin-top: 1.5rem;
+  margin-top: 1.3rem;
+}
+.content-spacing-vertical-05 {
+  margin-top: 0.5rem;
 }
 .content-spacing-horizontal {
   margin-left: 1.5rem;
   margin-right: 1.5rem;
 }
-
 .card-color {
-  background-color: #1A1D21; 
+  background-color: #1A1D21;
+  font-family: 'Poppins', sans-serif;
+  padding-left: 2rem;   /* aumenta da 1.5rem a 2rem */
+  padding-right: 2rem;
 }
 
 .buttons-row {
@@ -43,9 +48,16 @@
   width: 100%;
 }
 
-button-login-color {
-  background-color: #1E7F4D; 
-  border-color: #1E7F4D; 
+::ng-deep .button-login-color.p-button {
+  background-color: #005B41 !important;
+  border-color: #005B41 !important;
+  color: white !important;
+}
+
+::ng-deep .button-register-color.p-button {
+  background-color: #183D3D !important;
+  border-color: #183D3D !important;
+  color: white !important;
 }
 
 .card-header {
@@ -61,6 +73,11 @@ button-login-color {
    margin-top: 0.5rem;
   
 }
+.header-slot p-button {
+  margin-right: 2.4rem; /* spaziatura a destra se serve */
+  color: #183D3D !important;
+}
+
 
 .header-title {
   flex: 1;
@@ -69,3 +86,4 @@ button-login-color {
   font-weight: bold;
   margin-top: 0.5rem;
 }
+
