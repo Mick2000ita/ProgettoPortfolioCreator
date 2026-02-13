@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.jmportfolio.jm.core.exceptions.ApplicationException;
 import com.jmportfolio.jm.domains.roles.application.RoleService;
 import com.jmportfolio.jm.domains.users.client.dto.RegisterUserDto;
 import com.jmportfolio.jm.domains.users.domain.models.User;
@@ -40,6 +41,11 @@ public class UserService {
 
     @Transactional
     public void registerUser(RegisterUserDto dto) {
+        User existingUser = findByEmail(dto.getEmail());
+        if(existingUser != null) {
+            throw new ApplicationException("Email already in use", "EMAIL_IN_USE");
+        }
+
         User user = new User();
         user.setUsername(dto.getUsername());
         user.setEmail(dto.getEmail());
