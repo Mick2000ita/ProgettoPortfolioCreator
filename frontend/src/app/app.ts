@@ -3,11 +3,12 @@ import { Component, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 import { LoginPage } from "./login-page/login-page";
-import { NavbarComponent } from "./navbar/navbar.component";
+import { ReactiveBg } from "./reactive-bg/reactive-bg";
+import { NavbarComponent } from './navbar/navbar.component';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, LoginPage, NavbarComponent],  
+  imports: [RouterOutlet, LoginPage, ReactiveBg, NavbarComponent],  
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
