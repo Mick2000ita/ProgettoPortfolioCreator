@@ -34,7 +34,7 @@ public class JwtUserDetails implements UserDetailsService {
     @Override
     public ExtendedAuthUser loadUserByUsername(String username) {
         UserJpaEntity user = userRepository.findByUsername(username).orElseThrow(
-                () -> new ApplicationException("User not Found", "User not found"));
+                () -> new ApplicationException("User not Found: " + username, "User not found"));
 
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
         // Non-superadmin users must have a role assigned

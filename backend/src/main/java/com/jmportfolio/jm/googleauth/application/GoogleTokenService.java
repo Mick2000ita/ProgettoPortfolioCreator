@@ -14,7 +14,7 @@ import com.jmportfolio.jm.domains.users.domain.models.User;
 import com.jmportfolio.jm.googleauth.client.GoogleTokenVerifier;
 
 @Service
-public class TokenService {
+public class GoogleTokenService {
 
     private final GoogleTokenVerifier verifier;
 
@@ -22,7 +22,7 @@ public class TokenService {
     private UserService userService;
 
 
-    public TokenService(GoogleTokenVerifier verifier) {
+    public GoogleTokenService(GoogleTokenVerifier verifier) {
         this.verifier = verifier;
     }
 

@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.jmportfolio.jm.googleauth.application.TokenService;
+import com.jmportfolio.jm.googleauth.application.GoogleTokenService;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -18,7 +18,7 @@ import com.jmportfolio.jm.googleauth.application.TokenService;
 public class GoogleTokenController {
 
     @Autowired
-    private TokenService tokenService;
+    private GoogleTokenService tokenService;
     
     @PostMapping("/google")
     public ResponseEntity<?> googleLogin(@RequestBody Map<String, String> body) throws Exception {

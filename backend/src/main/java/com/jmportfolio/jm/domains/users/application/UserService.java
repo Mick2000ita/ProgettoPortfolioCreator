@@ -1,5 +1,7 @@
 package com.jmportfolio.jm.domains.users.application;
 
+import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,11 @@ public class UserService {
     @Transactional
     public User findByEmail(String email) {
         return userRepository.findByEmail(email);
+    }
+
+    @Transactional
+    public User findById(UUID id) {
+        return userRepository.findById(id);
     }
 
     @Transactional

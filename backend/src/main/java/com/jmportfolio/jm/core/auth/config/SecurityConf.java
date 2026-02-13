@@ -1,5 +1,6 @@
 package com.jmportfolio.jm.core.auth.config;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -8,9 +9,17 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.config.Customizer;
 
 @Configuration
 public class SecurityConf {
+
+    @Autowired
+    private JwtAuthenticationFilter authenticationFilter;
+
+    @Autowired
+    private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
     @Bean
     public AuthenticationManager authenticationManager(
@@ -37,11 +46,16 @@ public class SecurityConf {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/**").permitAll() // rotte di test
-                        .requestMatchers("/api/auth/google").permitAll() // il login con Google
+                        .requestMatchers("/api/auth/**").permitAll() // il login con Google
                         .anyRequest().authenticated())
                 .cors(cors -> {
-                });
+                })
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint));
+
+        // add filter
+        http.addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        http.headers(headers -> headers.cacheControl(Customizer.withDefaults()));
 
         return http.build();
     }
