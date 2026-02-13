@@ -50,3 +50,4 @@ stop:
 
 ##restart: @ Riavvia l'applicazione
 restart: stop start
+	docker compose logs -f backend

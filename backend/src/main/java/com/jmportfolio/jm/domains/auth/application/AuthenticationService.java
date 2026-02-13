@@ -39,7 +39,7 @@ public class AuthenticationService {
     }
 
     @Transactional
-    public LoginResponseDto loginApp(LoginRequestDto loginRequest) {
+    public LoginResponseDto login(LoginRequestDto loginRequest) {
         String username = loginRequest.getUsername();
 
         jwtuserDetailsService.authenticate(username, loginRequest.getPassword());

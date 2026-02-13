@@ -1,9 +1,11 @@
 package com.jmportfolio.jm.domains.users.application;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.jmportfolio.jm.domains.roles.application.RoleService;
+import com.jmportfolio.jm.domains.users.client.dto.RegisterUserDto;
 import com.jmportfolio.jm.domains.users.domain.models.User;
 import com.jmportfolio.jm.domains.users.domain.repo.UserRepository;
 
@@ -16,6 +18,10 @@ public class UserService {
 
     @Autowired
     private RoleService roleService;
+
+    
+    @Autowired
+    private BCryptPasswordEncoder bCryptPasswordEncoder;
 
     @Transactional
     public User findByEmail(String email) {
@@ -30,5 +36,15 @@ public class UserService {
         user.setAvatarUrl(picture);
         user.setRole(roleService.getUserRole());
         return userRepository.save(user);
+    }
+
+    @Transactional
+    public void registerUser(RegisterUserDto dto) {
+        User user = new User();
+        user.setUsername(dto.getUsername());
+        user.setEmail(dto.getEmail());
+        user.setPassword(bCryptPasswordEncoder.encode(dto.getPassword()));
+        user.setRole(roleService.getUserRole());
+        userRepository.save(user);
     }
 }

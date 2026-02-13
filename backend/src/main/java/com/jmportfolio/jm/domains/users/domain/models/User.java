@@ -20,6 +20,7 @@ public class User {
     private UUID id;
     private String email;
     private String username;
+    private String password;
     private String avatarUrl;
     private Role role;
     private Portfolio portfolio;

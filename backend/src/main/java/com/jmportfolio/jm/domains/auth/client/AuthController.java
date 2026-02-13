@@ -20,7 +20,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.extern.slf4j.Slf4j;
 
 @RestController
-@RequestMapping("/app/v1/auth")
+@RequestMapping("/api/auth")
 @Slf4j
 public class AuthController {
     @Autowired
@@ -29,7 +29,7 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponseDto login(@Valid @RequestBody LoginRequestDto loginRequest) {
         log.debug("Login {}", loginRequest.getUsername());
-        return userAuthenticationService.loginApp(loginRequest);
+        return userAuthenticationService.login(loginRequest);
     }
 
     @GetMapping("/refresh")

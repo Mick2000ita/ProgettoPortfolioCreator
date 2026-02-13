@@ -16,6 +16,7 @@ public class UserJpaMapper {
         }
         model.setEmail(entity.getEmail());
         model.setUsername(entity.getUsername());
+        model.setPassword(entity.getPassword());
         model.setAvatarUrl(entity.getAvatarUrl());
         model.setRole(RoleJpaMapper.entityToModel(entity.getRole()));
         model.setPortfolio(PortfolioJpaMapper.entityToModel(entity.getPortfolio()));
@@ -32,6 +33,7 @@ public class UserJpaMapper {
         }
         entity.setEmail(model.getEmail());
         entity.setUsername(model.getUsername());
+        entity.setPassword(model.getPassword());
         entity.setAvatarUrl(model.getAvatarUrl());
         entity.setRole(RoleJpaMapper.modelToEntity(model.getRole()));
         entity.setPortfolio(PortfolioJpaMapper.modelToEntity(model.getPortfolio()));
