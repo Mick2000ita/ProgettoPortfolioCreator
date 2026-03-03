@@ -1,0 +1,24 @@
+{
+  "login": {
+    "title": "Portfolio Creator",
+    "username": "Nome utente",
+    "email": "Email",
+    "password": "Password",
+    "confirm_password": "Conferma password",
+    "login_btn": "Accedi",
+    "register_btn": "Registrati",
+    "or": "oppure",
+    "errors": {
+      "username_required": "Inserisci il nome utente",
+      "email_required": "Inserisci l'email",
+      "email_invalid": "Email non valida",
+      "passwords_required": "Inserisci entrambe le password",
+      "passwords_mismatch": "Le password non corrispondono",
+      "registration_success": "Registrazione avvenuta con successo"
+    },
+    "toast": {
+      "warning": "Attenzione",
+      "success": "Successo"
+    }
+  }
+}

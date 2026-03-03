@@ -1,11 +1,11 @@
 @if (true) {
 <div class="center">
   <p-card class="shadow-6 border-round-xl center-title card-color" contentStyleClass="pt-4 "  ngSkipHydration>
-<ng-template #header> 
+<ng-template #header>
   <div class="card-header">
-<p-toast 
-  [key]="'registerToast'" 
-  [position]="isSmallScreen ? 'top-center' : 'top-right'" 
+<p-toast
+  [key]="'registerToast'"
+  [position]="isSmallScreen ? 'top-center' : 'top-right'"
   [breakpoints]="{ '920px': { width: 'auto' } }">
 </p-toast>
     <div class="header-slot">
@@ -14,62 +14,62 @@
       }
     </div>
     <div class="header-title">
-      Portfolio Creator
+      {{ 'login.title' | translate }}
     </div>
     <div class="header-slot"></div>
 
   </div>
 </ng-template>
- 
+
 
     <div class="flex flex-column align-items-center gap-3">
       <div class="content-spacing-vertical">
         <p-floatlabel>
           <input id="username" pInputText [(ngModel)]="user" autocomplete="on" />
-          <label for="username">Username</label>
+          <label for="username">{{ 'login.username' | translate }}</label>
         </p-floatlabel>
       </div>
       @if(registrationFormVisible){
         <div class="content-spacing-vertical">
           <p-floatlabel>
             <input id="email" pInputText [(ngModel)]="email" type="email" autocomplete="on" />
-            <label for="email">Email</label>
+            <label for="email">{{ 'login.email' | translate }}</label>
           </p-floatlabel>
         </div>
       }
       <div class="content-spacing-vertical">
         <p-floatlabel>
           <input id="password" pInputText [(ngModel)]="password" type="password" autocomplete="on" />
-          <label for="password">Password</label>
+          <label for="password">{{ 'login.password' | translate }}</label>
         </p-floatlabel>
       </div>
       <div class="content-spacing-vertical">
           @if (registrationFormVisible) {
         <p-floatlabel>
           <input id="confirmPassword" pInputText [(ngModel)]="confirmPassword" type="password" autocomplete="on" />
-          <label for="confirmPassword">Confirm Password</label>
+          <label for="confirmPassword">{{ 'login.confirm_password' | translate }}</label>
         </p-floatlabel>
           }
       </div>
       <div class="center-title content-spacing-vertical">
         <div class="content-spacing-vertical">
             @if (!registrationFormVisible) {
-          <div class="flex full-width-btn content-spacing-vertical-05">   
-            <p-button label="Login"  styleClass="button-login-color"></p-button>
+          <div class="flex full-width-btn content-spacing-vertical-05">
+            <p-button [label]="'login.login_btn' | translate" styleClass="button-login-color"></p-button>
           </div>
           <div class="flex full-width-btn content-spacing-vertical-05">
-            <p-button label="Register"  styleClass="button-register-color" (onClick)="openRegisterForm()"></p-button>
+            <p-button [label]="'login.register_btn' | translate" styleClass="button-register-color" (onClick)="openRegisterForm()"></p-button>
           </div>
            }
            @if (registrationFormVisible) {
           <div class="button-container">
-        <p-button label="Register"   styleClass="full-width-btn button-register-color" (onClick)="registerUser()">
+        <p-button [label]="'login.register_btn' | translate" styleClass="full-width-btn button-register-color" (onClick)="registerUser()">
             </p-button>
           </div>
-            
-           }          
+
+           }
         </div>
-        <div style="margin-top: 0.5rem">or</div>
+        <div style="margin-top: 0.5rem">{{ 'login.or' | translate }}</div>
       </div>
       <div class="content-spacing-vertical">
         <app-google-login ngSkipHydration></app-google-login>

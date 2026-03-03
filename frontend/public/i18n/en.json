@@ -1,0 +1,24 @@
+{
+  "login": {
+    "title": "Portfolio Creator",
+    "username": "Username",
+    "email": "Email",
+    "password": "Password",
+    "confirm_password": "Confirm Password",
+    "login_btn": "Login",
+    "register_btn": "Register",
+    "or": "or",
+    "errors": {
+      "username_required": "Enter your username",
+      "email_required": "Enter your email",
+      "email_invalid": "Invalid email address",
+      "passwords_required": "Enter both passwords",
+      "passwords_mismatch": "Passwords do not match",
+      "registration_success": "Registration successful"
+    },
+    "toast": {
+      "warning": "Warning",
+      "success": "Success"
+    }
+  }
+}
