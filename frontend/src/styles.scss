@@ -6,6 +6,13 @@
   font-weight: normal;
   font-style: normal;
 }
+
 body, .center, .center-title, input, p-button {
   font-family: 'Poppins', sans-serif;
+}
+
+/* Force dark card background globally — overrides PrimeNG light-theme variables */
+.p-card {
+  background: rgba(12, 16, 18, 0.92) !important;
+  color: #d8ede8 !important;
 }

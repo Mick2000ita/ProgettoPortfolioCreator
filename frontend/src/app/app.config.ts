@@ -19,7 +19,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideClientHydration(withEventReplay()),
     provideHttpClient(withFetch()),
-    providePrimeNG({ theme: { preset: nora } }),
+    providePrimeNG({ theme: { preset: nora, options: { darkModeSelector: ':root' } } }),
     provideTranslateService(),
     provideTranslateHttpLoader({ prefix: '/i18n/', suffix: '.json' }),
     provideAppInitializer(() => {

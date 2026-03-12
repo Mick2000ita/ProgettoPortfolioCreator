@@ -6,8 +6,6 @@ import {
 } from '@angular/core';
 
 interface Hex {
-  x: number;
-  y: number;
   ox: number;
   oy: number;
 }
@@ -16,7 +14,6 @@ interface Wave {
   x: number;
   y: number;
   radius: number;
-  baseStrength: number;
   age: number;
   life: number;
 }
@@ -35,8 +32,9 @@ export class ReactiveBg {
   waves: Wave[] = [];
 
   hexRadius = 16;
-  stroke = 1;
+  stroke = 0.8;
   timeBetweenWaves = 1800;
+  ringWidth = 32;
 
   @HostListener('window:load')
   onLoad() {
@@ -68,7 +66,7 @@ export class ReactiveBg {
     for (let y = r; y < c.height + h; y += vStep) {
       const offsetX = row % 2 === 0 ? 0 : w / 2;
       for (let x = offsetX; x < c.width + w; x += w) {
-        this.hexes.push({ x, y, ox: x, oy: y });
+        this.hexes.push({ ox: x, oy: y });
       }
       row++;
     }
@@ -80,9 +78,8 @@ export class ReactiveBg {
       x: Math.random() * c.width,
       y: Math.random() * c.height,
       radius: 0,
-      baseStrength: 22,
       age: 0,
-      life: 240
+      life: 220
     });
   }
 
@@ -106,21 +103,17 @@ export class ReactiveBg {
     this.ctx.clearRect(0, 0, c.width, c.height);
 
     this.waves.forEach(w => {
-      w.radius += 1.1;
-      w.age += 1;
+      w.radius += 1.2;
+      w.age++;
     });
 
-    // rimuovi onde scadute
-    this.waves = this.waves.filter(w => w.age <= w.life && w.radius < 800);
+    this.waves = this.waves.filter(w => w.age <= w.life);
 
-    this.ctx.strokeStyle = '#005B41';
-    this.ctx.lineWidth = this.stroke;
     this.ctx.lineJoin = 'round';
     this.ctx.lineCap = 'round';
 
     for (const h of this.hexes) {
-      let offsetX = 0;
-      let offsetY = 0;
+      let glow = 0;
 
       for (const w of this.waves) {
         const dx = h.ox - w.x;
@@ -128,22 +121,20 @@ export class ReactiveBg {
         const dist = Math.sqrt(dx * dx + dy * dy);
         const diff = Math.abs(dist - w.radius);
 
-        if (diff < 18) {
-          const t = Math.min(1, w.age / 40);
-          const fade = 1 - Math.min(1, w.age / w.life);
-          const smooth = t * t * (3 - 2 * t);
-          const strength = w.baseStrength * smooth * fade;
-
-          const force = (1 - diff / 18) * strength;
-          offsetX += (dx / dist) * force;
-          offsetY += (dy / dist) * force;
+        if (diff < this.ringWidth) {
+          const fade = 1 - (w.age / w.life);
+          const proximity = 1 - diff / this.ringWidth;
+          // smooth bell curve: ease-in-out
+          const intensity = proximity * proximity * (3 - 2 * proximity) * fade;
+          glow = Math.max(glow, intensity);
         }
       }
 
-      h.x += (h.ox + offsetX - h.x) * 0.07;
-      h.y += (h.oy + offsetY - h.y) * 0.07;
-
-      this.drawHex(h.x, h.y, this.hexRadius);
+      // base opacity 0.11, peaks at ~0.85 when wave front passes
+      const alpha = 0.11 + glow * 0.74;
+      this.ctx.strokeStyle = `rgba(0, 91, 65, ${alpha})`;
+      this.ctx.lineWidth = this.stroke + glow * 0.9;
+      this.drawHex(h.ox, h.oy, this.hexRadius);
     }
 
     requestAnimationFrame(this.animate);

@@ -69,7 +69,11 @@
 
            }
         </div>
-        <div style="margin-top: 0.5rem">{{ 'login.or' | translate }}</div>
+        <div class="or-divider">
+          <span class="or-line"></span>
+          <span class="or-text">{{ 'login.or' | translate }}</span>
+          <span class="or-line"></span>
+        </div>
       </div>
       <div class="content-spacing-vertical">
         <app-google-login ngSkipHydration></app-google-login>
