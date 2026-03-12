@@ -33,6 +33,14 @@ build:
 logs:
 	docker compose logs --follow
 
+##logs-fe: @ Mostra i logs di tutti i containers
+logs-fe:
+	docker compose logs --follow frontend-dev
+
+##logs-be: @ Mostra i logs di tutti i containers
+logs-be:
+	docker compose logs --follow backend
+
 ##code: @ Apre vscode
 code: 
 	code shopfloor.code-workspace

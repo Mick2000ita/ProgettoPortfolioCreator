@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
+import { environment } from '../../environments/environment';
 
 @Component({
   selector: 'app-test-button',
@@ -14,7 +15,7 @@ export class TestButtonComponent {
   result: any;
 
   runTest() {
-    this.http.get<any>('http://localhost:8080/api/test').subscribe({
+    this.http.get<any>(`${environment.apiUrl}/api/test`).subscribe({
       next: (response) => this.result = response,
       error: (err) => console.error(err)
     });

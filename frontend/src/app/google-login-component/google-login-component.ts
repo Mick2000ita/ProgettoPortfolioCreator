@@ -1,5 +1,7 @@
-import { Component, AfterViewInit } from '@angular/core';
+import { Component, AfterViewInit, Inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
 declare var google: any;
 
@@ -9,11 +11,13 @@ declare var google: any;
 })
 export class GoogleLoginComponent implements AfterViewInit {
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, @Inject(PLATFORM_ID) private platformId: object) {}
 
   ngAfterViewInit(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+
     google.accounts.id.initialize({
-      client_id: '707290238106-bu0h2h60r609ib3k2ia53cr0cbaaofer.apps.googleusercontent.com',
+      client_id: environment.googleClientId,
       callback: (response: any) => this.login(response.credential)
     });
 
@@ -24,7 +28,7 @@ export class GoogleLoginComponent implements AfterViewInit {
   }
 
   login(idToken: string) {
-    this.http.post('http://localhost:8080/api/auth/google', {
+    this.http.post(`${environment.apiUrl}/api/auth/google`, {
       token: idToken
     }).subscribe(res => {
       console.log('Login OK', res);
