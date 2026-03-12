@@ -10,6 +10,7 @@ import { ButtonModule } from 'primeng/button';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { AuthService } from './auth.service';
 
 @Component({
   selector: 'app-login-page',
@@ -28,6 +29,7 @@ export class LoginPage {
   private messageService = inject(MessageService);
   private translate = inject(TranslateService);
   private platformId = inject(PLATFORM_ID);
+  private authService = inject(AuthService);
 
   isSmallScreen = false;
 
@@ -42,6 +44,37 @@ export class LoginPage {
     if (isPlatformBrowser(this.platformId)) {
       this.isSmallScreen = window.innerWidth < 920;
     }
+  }
+
+  login() {
+    if (!this.user || !this.password) {
+      this.messageService.add({
+        key: 'registerToast',
+        severity: 'warn',
+        summary: this.translate.instant('login.toast.warning'),
+        detail: this.translate.instant('login.errors.username_required')
+      });
+      return;
+    }
+
+    this.authService.login({ username: this.user, password: this.password }).subscribe({
+      next: () => {
+        this.messageService.add({
+          key: 'registerToast',
+          severity: 'success',
+          summary: this.translate.instant('login.toast.success'),
+          detail: this.translate.instant('login.toast.login_success')
+        });
+      },
+      error: () => {
+        this.messageService.add({
+          key: 'registerToast',
+          severity: 'error',
+          summary: this.translate.instant('login.toast.error'),
+          detail: this.translate.instant('login.errors.login_failed')
+        });
+      }
+    });
   }
 
   registerUser() {
@@ -78,11 +111,24 @@ export class LoginPage {
       return;
     }
 
-    this.messageService.add({
-      key: 'registerToast',
-      severity: 'success',
-      summary: this.translate.instant('login.toast.success'),
-      detail: this.translate.instant('login.errors.registration_success')
+    this.authService.register({ username: this.user!, email: this.email, password: this.password! }).subscribe({
+      next: () => {
+        this.messageService.add({
+          key: 'registerToast',
+          severity: 'success',
+          summary: this.translate.instant('login.toast.success'),
+          detail: this.translate.instant('login.errors.registration_success')
+        });
+        this.registrationFormVisible = false;
+      },
+      error: () => {
+        this.messageService.add({
+          key: 'registerToast',
+          severity: 'error',
+          summary: this.translate.instant('login.toast.error'),
+          detail: this.translate.instant('login.errors.registration_failed')
+        });
+      }
     });
   }
 

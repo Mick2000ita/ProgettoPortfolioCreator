@@ -1,13 +1,13 @@
 @if (true) {
-<div class="center">
-  <p-card class="shadow-6 border-round-xl center-title card-color" contentStyleClass="pt-4 "  ngSkipHydration>
-<ng-template #header>
-  <div class="card-header">
 <p-toast
   [key]="'registerToast'"
   [position]="isSmallScreen ? 'top-center' : 'top-right'"
   [breakpoints]="{ '920px': { width: 'auto' } }">
 </p-toast>
+<div class="center">
+  <p-card class="shadow-6 border-round-xl center-title card-color" contentStyleClass="pt-4 "  ngSkipHydration>
+<ng-template #header>
+  <div class="card-header">
     <div class="header-slot">
       @if (registrationFormVisible) {
         <p-button icon="pi pi-arrow-left" [outlined]="true" [rounded]="true" (onClick)="openRegisterForm()"></p-button>
@@ -55,15 +55,15 @@
         <div class="content-spacing-vertical">
             @if (!registrationFormVisible) {
           <div class="flex full-width-btn content-spacing-vertical-05">
-            <p-button [label]="'login.login_btn' | translate" styleClass="button-login-color"></p-button>
+            <p-button (onClick)="login()" [label]="'login.login_btn' | translate" styleClass="button-login-color"></p-button>
           </div>
           <div class="flex full-width-btn content-spacing-vertical-05">
-            <p-button [label]="'login.register_btn' | translate" styleClass="button-register-color" (onClick)="openRegisterForm()"></p-button>
+            <p-button (onClick)="openRegisterForm()" [label]="'login.register_btn' | translate" styleClass="button-register-color"></p-button>
           </div>
            }
            @if (registrationFormVisible) {
           <div class="button-container">
-        <p-button [label]="'login.register_btn' | translate" styleClass="full-width-btn button-register-color" (onClick)="registerUser()">
+        <p-button (onClick)="registerUser()" [label]="'login.register_btn' | translate" styleClass="full-width-btn button-register-color">
             </p-button>
           </div>
 
