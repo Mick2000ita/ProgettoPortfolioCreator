@@ -3,12 +3,13 @@ package com.jmportfolio.jm.googleauth.application;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.jmportfolio.jm.core.auth.application.JwtUserDetails;
+import com.jmportfolio.jm.core.auth.application.TokenUtil;
+import com.jmportfolio.jm.core.auth.model.ExtendedAuthUser;
+import com.jmportfolio.jm.domains.auth.client.dto.LoginResponseDto;
 import com.jmportfolio.jm.domains.users.application.UserService;
 import com.jmportfolio.jm.domains.users.domain.models.User;
 import com.jmportfolio.jm.googleauth.client.GoogleTokenVerifier;
@@ -21,13 +22,17 @@ public class GoogleTokenService {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private TokenUtil jwtTokenUtil;
+
+    @Autowired
+    private JwtUserDetails jwtUserDetails;
 
     public GoogleTokenService(GoogleTokenVerifier verifier) {
         this.verifier = verifier;
     }
 
-    @PostMapping("/google")
-    public ResponseEntity<?> googleLogin(@RequestBody Map<String, String> body) throws Exception {
+    public LoginResponseDto googleLogin(Map<String, String> body) throws Exception {
         String token = body.get("token");
         GoogleIdToken.Payload payload = verifier.verify(token);
 
@@ -35,18 +40,15 @@ public class GoogleTokenService {
         String name = (String) payload.get("name");
         String picture = (String) payload.get("picture");
 
-
         User user = userService.findByEmail(email);
         if (user == null) {
             user = userService.createuserFromGoogle(email, name, picture);
         }
 
-        return ResponseEntity.ok(Map.of(
-                "email", user.getEmail(),
-                "name", user.getUsername(),
-                "picture", user.getAvatarUrl()
-        ));
+        ExtendedAuthUser userDetails = jwtUserDetails.loadUserByUsername(user.getUsername());
+        String accessToken = jwtTokenUtil.generateUserToken(userDetails);
+        String refreshToken = jwtTokenUtil.refreshUserToken(accessToken);
+
+        return new LoginResponseDto(accessToken, refreshToken, user);
     }
-
-
 }

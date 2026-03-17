@@ -39,7 +39,7 @@ logs-fe:
 
 ##logs-be: @ Mostra i logs di tutti i containers
 logs-be:
-	docker compose logs --follow backend
+	docker compose logs --follow backend-dev
 
 ##code: @ Apre vscode
 code: 
@@ -58,4 +58,4 @@ stop:
 
 ##restart: @ Riavvia l'applicazione
 restart: stop start
-	docker compose logs -f backend
+	docker compose logs -f backend-dev

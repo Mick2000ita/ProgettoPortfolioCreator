@@ -1,0 +1,11 @@
+FROM maven:3.9-eclipse-temurin-21
+WORKDIR /app
+
+# Pre-download dependencies (cached layer — speeds up first start)
+COPY pom.xml .
+RUN mvn dependency:go-offline -q
+
+COPY docker-dev-entrypoint.sh /docker-dev-entrypoint.sh
+RUN chmod +x /docker-dev-entrypoint.sh
+
+ENTRYPOINT ["/docker-dev-entrypoint.sh"]
