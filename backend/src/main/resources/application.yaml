@@ -16,5 +16,6 @@ spring:
     
 jwt:
   secret: ${JWT_SECRET:default_secret_key}
-  expiration-access-token: ${JWT_EXPIRATION_ACCESS_TOKEN:3600000} # 1 hour
-  expiration-refresh-token: ${JWT_EXPIRATION_REFRESH_TOKEN:86400000} # 24 hours
+  expiration-access-token: ${JWT_EXPIRATION_ACCESS_TOKEN:3600} # seconds, 1 hour
+  expiration-refresh-token: ${JWT_EXPIRATION_REFRESH_TOKEN:604800} # seconds, 7 days
+  expiration-remember-me-refresh-token: ${JWT_EXPIRATION_REMEMBER_ME_REFRESH_TOKEN:2592000} # seconds, 30 days

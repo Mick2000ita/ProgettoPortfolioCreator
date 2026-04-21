@@ -1,0 +1,91 @@
+<div class="portfolios-shell">
+  <p-confirmdialog />
+
+  <section class="page-head">
+    <div class="head-copy">
+      <div class="eyebrow">Portfolio</div>
+      <h1>I tuoi portfolio</h1>
+      <p>
+        Qui puoi vedere i portfolio collegati al tuo account e avviare la creazione di uno nuovo.
+      </p>
+    </div>
+
+    <a routerLink="/portfolios/new" class="create-link">
+      <p-button label="Nuovo portfolio" icon="pi pi-plus-circle" />
+    </a>
+  </section>
+
+  @if (isLoading()) {
+    <section class="empty-card">
+      <strong>Caricamento in corso...</strong>
+      <p>Sto recuperando il tuo spazio portfolio.</p>
+    </section>
+  } @else if (portfolios().length > 0) {
+    <section class="portfolio-grid">
+      @for (portfolio of portfolios(); track portfolio.id) {
+        <p-card styleClass="portfolio-card">
+          <ng-template #header>
+            <div class="card-top">
+              <span class="status-pill" [class.status-public]="portfolio.public">
+                {{ portfolio.public ? 'Pubblico' : 'Privato' }}
+              </span>
+            </div>
+          </ng-template>
+
+          <div class="portfolio-content">
+            <strong>{{ portfolio.title }}</strong>
+            <span>/{{ portfolio.slug }}</span>
+            <p>
+              Questo portfolio e' gia' associato al tuo account ed e' pronto per evolvere con
+              progetti, layout e contenuti.
+            </p>
+
+            <div class="card-actions">
+              <button
+                pButton
+                type="button"
+                class="action-button"
+                icon="pi pi-eye"
+                [rounded]="true"
+                [text]="true"
+                aria-label="Visualizza portfolio"
+                (click)="viewPortfolio(portfolio.slug)"
+              ></button>
+
+              <button
+                pButton
+                type="button"
+                class="action-button"
+                icon="pi pi-pen-to-square"
+                [rounded]="true"
+                [text]="true"
+                aria-label="Modifica portfolio"
+                (click)="editPortfolio(portfolio.slug)"
+              ></button>
+
+              <button
+                pButton
+                type="button"
+                class="action-button action-button-danger"
+                icon="pi pi-trash"
+                [rounded]="true"
+                [text]="true"
+                [loading]="deletingSlug() === portfolio.slug"
+                aria-label="Rimuovi portfolio"
+                (click)="confirmDeletePortfolio(portfolio)"
+              ></button>
+            </div>
+          </div>
+        </p-card>
+      }
+    </section>
+  } @else {
+    <section class="empty-card">
+      <strong>Non hai ancora portfolio associati.</strong>
+      <p>Crea il primo portfolio per iniziare a costruire la tua presenza online.</p>
+      <a routerLink="/portfolios/new" class="inline-create-link">
+        <p-button label="Crea il primo portfolio" icon="pi pi-plus" />
+      </a>
+    </section>
+  }
+</div>

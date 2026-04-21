@@ -1,0 +1,163 @@
+.portfolios-shell {
+  min-height: 100vh;
+  padding: 2rem;
+  color: #eff6f2;
+}
+
+.page-head {
+  max-width: 1200px;
+  margin: 0 auto 1.35rem;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.head-copy {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.eyebrow {
+  display: inline-flex;
+  justify-self: start;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(0, 91, 65, 0.18);
+  color: #83d1b4;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+}
+
+.head-copy h1 {
+  margin: 0;
+  font-size: clamp(2.3rem, 4vw, 4.2rem);
+  line-height: 1;
+  max-width: 11ch;
+}
+
+.head-copy p {
+  margin: 0;
+  color: #c3d5cf;
+  line-height: 1.7;
+  max-width: 40rem;
+}
+
+.create-link,
+.inline-create-link {
+  text-decoration: none;
+}
+
+.portfolio-grid {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.card-top {
+  padding: 1.2rem 1.2rem 0;
+}
+
+.status-pill {
+  display: inline-flex;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(209, 142, 98, 0.14);
+  color: #efc7a9;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.status-public {
+  background: rgba(131, 209, 180, 0.14);
+  color: #8ed6bc;
+}
+
+.portfolio-content {
+  display: grid;
+  gap: 0.55rem;
+  color: #c3d5cf;
+  line-height: 1.65;
+}
+
+.portfolio-content strong {
+  color: #eff6f2;
+  font-size: 1.18rem;
+}
+
+.portfolio-content span {
+  color: #8ed6bc;
+}
+
+.portfolio-content p {
+  margin: 0.2rem 0 0;
+}
+
+.card-actions {
+  display: flex;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+:host ::ng-deep .action-button.p-button {
+  width: 2.6rem;
+  height: 2.6rem;
+  color: #8ed6bc;
+}
+
+:host ::ng-deep .action-button.p-button:hover {
+  background: rgba(131, 209, 180, 0.12);
+}
+
+:host ::ng-deep .action-button-danger.p-button {
+  color: #f2a4a4;
+}
+
+:host ::ng-deep .action-button-danger.p-button:hover {
+  background: rgba(191, 69, 69, 0.14);
+}
+
+.empty-card {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.5rem;
+  border-radius: 1.6rem;
+  background: rgba(9, 17, 18, 0.72);
+  border: 1px solid rgba(186, 220, 206, 0.1);
+}
+
+.empty-card strong {
+  font-size: 1.18rem;
+  color: #eff6f2;
+}
+
+.empty-card p {
+  margin: 0;
+  color: #c3d5cf;
+  line-height: 1.7;
+}
+
+:host ::ng-deep .portfolio-card {
+  height: 100%;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(186, 220, 206, 0.12);
+  background: rgba(9, 17, 18, 0.7);
+  color: inherit;
+}
+
+@media (max-width: 860px) {
+  .portfolios-shell {
+    padding: 1.15rem;
+  }
+
+  .page-head {
+    align-items: start;
+    flex-direction: column;
+  }
+}

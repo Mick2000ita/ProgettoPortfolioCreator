@@ -1,0 +1,164 @@
+<div class="new-portfolio-shell">
+  <section class="intro-card">
+    <div class="eyebrow">Step 1</div>
+    <h1>Imposta il setup iniziale del tuo portfolio.</h1>
+    <p>
+      Questo step serve a definire nome, URL e contenuti iniziali. Dopo la creazione entrerai in
+      un editor dedicato per continuare a costruire il portfolio.
+      L'URL finale conterra' solo il nome scelto, ad esempio
+      <code>/{{ slugPreview() || 'nome-portfolio' }}</code>.
+    </p>
+
+    <form class="portfolio-form" [formGroup]="portfolioForm" (ngSubmit)="submit()">
+      <div class="form-section">
+        <h2>1. Identita' del portfolio</h2>
+
+        <label class="field-block">
+          <span>Nome del portfolio</span>
+          <input pInputText formControlName="title" placeholder="Es. marco-rinaldi" />
+        </label>
+
+        <div class="slug-preview">
+          URL condivisibile:
+          <strong>/{{ slugPreview() || 'nome-portfolio' }}</strong>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="section-head">
+          <div>
+            <h2>2. Aggiungi contenuto</h2>
+            <p class="section-copy">
+              Puoi aggiungere piu' blocchi dello stesso tipo invece di scegliere moduli fissi.
+            </p>
+          </div>
+
+          <div class="add-row">
+            <select
+              class="content-select"
+              [value]="selectedContentType()"
+              (change)="setSelectedContentType($any($event.target).value)"
+            >
+              @for (option of contentOptions; track option.value) {
+                <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
+
+            <p-button
+              type="button"
+              label="Aggiungi contenuto"
+              icon="pi pi-plus"
+              (onClick)="addSelectedContent()"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="contents-stack" formArrayName="contents">
+        @if (contentsArray.length === 0) {
+          <section class="form-section empty-content-state">
+            <strong>Nessun contenuto aggiunto.</strong>
+            <p>Seleziona un tipo di contenuto e premi “Aggiungi contenuto” per iniziare.</p>
+          </section>
+        }
+
+        @for (content of contentsArray.controls; track trackContent($index, content); let index = $index) {
+          <section class="form-section content-section" [formGroupName]="index">
+            <div class="content-head">
+              <div>
+                <span class="content-type">{{ getContentTypeLabel(content.controls.type.value) }}</span>
+                <h3>{{ content.controls.label.value }}</h3>
+              </div>
+
+              <button type="button" class="remove-button" (click)="removeContent(index)">
+                Rimuovi
+              </button>
+            </div>
+
+            @if (isType(content, 'title')) {
+              <label class="field-block">
+                <span>Titolo</span>
+                <input pInputText formControlName="textValue" placeholder="Titolo principale" />
+              </label>
+            }
+
+            @if (isType(content, 'description')) {
+              <label class="field-block">
+                <span>Descrizione</span>
+                <textarea
+                  pTextarea
+                  formControlName="textValue"
+                  rows="4"
+                  placeholder="Descrizione del portfolio"
+                ></textarea>
+              </label>
+            }
+
+            @if (isType(content, 'background')) {
+              <label class="field-block">
+                <span>Background</span>
+                <input type="color" class="color-input" formControlName="colorValue" />
+              </label>
+            }
+
+            @if (isType(content, 'cv')) {
+              <label class="field-block">
+                <span>CV (PDF)</span>
+                <input type="file" accept="application/pdf" (change)="onCvSelected(index, $event)" />
+                @if (content.controls.fileName.value) {
+                  <small>{{ content.controls.fileName.value }}</small>
+                }
+              </label>
+
+              @if (isExtractingCv()) {
+                <div class="helper-box">Sto estraendo il testo dal CV...</div>
+              }
+
+              @if (extractionError()) {
+                <div class="helper-box helper-box-error">{{ extractionError() }}</div>
+              }
+
+              <label class="field-block">
+                <span>Testo estratto dal CV</span>
+                <textarea
+                  pTextarea
+                  formControlName="textValue"
+                  rows="10"
+                  placeholder="Il testo del CV apparira' qui e potra' essere modificato."
+                ></textarea>
+              </label>
+            }
+
+            @if (isType(content, 'image')) {
+              <label class="field-block">
+                <span>Immagini</span>
+                <input type="file" accept="image/*" multiple (change)="onImagesSelected(index, $event)" />
+              </label>
+
+              @if (content.controls.images.value.length > 0) {
+                <div class="preview-grid">
+                  @for (image of content.controls.images.value; track image) {
+                    <img [src]="image" alt="Anteprima immagine" />
+                  }
+                </div>
+              }
+            }
+          </section>
+        }
+      </div>
+
+      <div class="actions-row">
+        <a routerLink="/portfolios" class="back-link">
+          <p-button label="Torna ai portfolio" icon="pi pi-arrow-left" [outlined]="true" />
+        </a>
+
+        <p-button
+          type="submit"
+          label="Crea e apri editor"
+          icon="pi pi-arrow-right"
+          [loading]="isSubmitting()"
+        />
+      </div>
+    </form>
+  </section>
+</div>

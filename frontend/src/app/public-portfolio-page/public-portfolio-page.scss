@@ -1,0 +1,89 @@
+.public-shell {
+  min-height: 100vh;
+  padding: 2rem;
+  color: #eff6f2;
+}
+
+.portfolio-card,
+.empty-state {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1.25rem;
+  padding: 2rem;
+  border-radius: 1.85rem;
+  background: rgba(9, 17, 18, 0.52);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.portfolio-card h1,
+.empty-state h1 {
+  margin: 0;
+  font-size: clamp(2.5rem, 5vw, 5rem);
+  line-height: 1;
+}
+
+.description-text {
+  margin: 0;
+  color: #d9e7e2;
+  font-size: 1.08rem;
+  line-height: 1.8;
+  max-width: 48rem;
+}
+
+.empty-state p {
+  margin: 0;
+  color: #d0ddd8;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.gallery-grid img {
+  width: 100%;
+  min-height: 260px;
+  object-fit: cover;
+  border-radius: 1.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cv-link {
+  display: inline-flex;
+  justify-self: start;
+  padding: 0.8rem 1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #f7fffb;
+  text-decoration: none;
+}
+
+.cv-box {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 1.3rem;
+  background: rgba(9, 17, 18, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cv-box h2 {
+  margin: 0;
+}
+
+.cv-box pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  line-height: 1.7;
+  color: #d7e4df;
+}
+
+@media (max-width: 780px) {
+  .public-shell {
+    padding: 1.15rem;
+  }
+}

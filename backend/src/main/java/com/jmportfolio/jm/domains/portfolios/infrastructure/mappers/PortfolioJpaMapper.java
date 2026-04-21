@@ -2,7 +2,6 @@ package com.jmportfolio.jm.domains.portfolios.infrastructure.mappers;
 
 import com.jmportfolio.jm.domains.portfolios.domain.models.Portfolio;
 import com.jmportfolio.jm.domains.portfolios.infrastructure.entities.PortfolioJpaEntity;
-import com.jmportfolio.jm.domains.users.infrastructure.mappers.UserJpaMapper;
 
 public class PortfolioJpaMapper {
     public static Portfolio entityToModel(PortfolioJpaEntity entity) {
@@ -17,7 +16,6 @@ public class PortfolioJpaMapper {
         model.setPublicData(entity.getPublicData());
         model.setWipData(entity.getWipData());
         model.setPublic(entity.isPublic());
-        model.setUser(UserJpaMapper.entityToModel(entity.getUserJpaEntity()));
         return model;
     }
 
@@ -27,13 +25,14 @@ public class PortfolioJpaMapper {
         }
 
         PortfolioJpaEntity entity = new PortfolioJpaEntity();
-        entity.setId(model.getId());
+        if (model.getId() != null) {
+            entity.setId(model.getId());
+        }
         entity.setTitle(model.getTitle());
         entity.setSlug(model.getSlug());
         entity.setPublicData(model.getPublicData());
         entity.setWipData(model.getWipData());
         entity.setPublic(model.isPublic());
-        entity.setUserJpaEntity(UserJpaMapper.modelToEntity(model.getUser()));
         return entity;
     }
 }

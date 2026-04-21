@@ -19,8 +19,12 @@ public interface UserJpaRepo extends BaseRepository<UserJpaEntity, UUID> {
     @Query("SELECT u FROM UserJpaEntity u WHERE u.id = :id")
     Optional<UserJpaEntity> findByIdWithRole(@Param("id") UUID id);
 
-    @EntityGraph(attributePaths = { "role", "portfolio" })
+    @EntityGraph(attributePaths = { "role" })
     @Query("SELECT u FROM UserJpaEntity u WHERE u.id = :id")
-    Optional<UserJpaEntity> findByIdWithRoleAndPortfolio(@Param("id") UUID id);
+    Optional<UserJpaEntity> findByIdWithRoleAndPortfolios(@Param("id") UUID id);
+
+    @EntityGraph(attributePaths = { "role" })
+    @Query("SELECT u FROM UserJpaEntity u WHERE u.username = :username")
+    Optional<UserJpaEntity> findByUsernameWithRole(@Param("username") String username);
 
 }

@@ -1,0 +1,47 @@
+<div class="public-shell" [style.background]="backgroundColor()">
+  @if (notFound()) {
+    <section class="empty-state">
+      <h1>Portfolio non trovato</h1>
+      <p>Lo slug richiesto non corrisponde a nessun portfolio pubblico disponibile.</p>
+    </section>
+  } @else if (portfolio(); as currentPortfolio) {
+    <section class="portfolio-card">
+      @if (titleModules().length > 0) {
+        @for (module of titleModules(); track module) {
+          <h1>{{ module.value }}</h1>
+        }
+      } @else {
+        <h1>{{ currentPortfolio.title }}</h1>
+      }
+
+      @for (module of descriptionModules(); track module) {
+        <p class="description-text">{{ module.value }}</p>
+      }
+
+      @for (module of imageModules(); track module) {
+        @if (module.values?.length) {
+          <div class="gallery-grid">
+            @for (image of module.values; track image) {
+              <img [src]="image" alt="Portfolio image" />
+            }
+          </div>
+        }
+      }
+
+      @for (module of cvModules(); track module) {
+        @if (module.value) {
+          <section class="cv-box">
+            <h2>CV</h2>
+            <pre>{{ module.value }}</pre>
+
+            @if (module.fileData) {
+              <a class="cv-link" [href]="module.fileData" [attr.download]="module.fileName || 'cv.pdf'">
+                Scarica CV
+              </a>
+            }
+          </section>
+        }
+      }
+    </section>
+  }
+</div>

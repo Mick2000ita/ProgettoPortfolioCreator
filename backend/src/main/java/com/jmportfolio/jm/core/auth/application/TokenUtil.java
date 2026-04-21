@@ -34,12 +34,16 @@ public class TokenUtil {
 
     static final String CLAIM_KEY_REFRESH = "isRefreshToken";
     static final String CLAIM_ROLES = "roles";
+    static final String CLAIM_KEY_REMEMBER_ME = "rememberMe";
 
-    @Value("${token.expiration.access:64800}") // 1 day
+    @Value("${jwt.expiration-access-token:3600}") // 1 hour
     private Long expirationAccessToken;
 
-    @Value("${token.expiration.refresh:604800}") // 7 days
+    @Value("${jwt.expiration-refresh-token:604800}") // 7 days
     private Long expirationRefreshToken;
+
+    @Value("${jwt.expiration-remember-me-refresh-token:2592000}") // 30 days
+    private Long expirationRememberMeRefreshToken;
 
     @Autowired
     private TokenKeyResolver tokenKeyResolver;
@@ -236,6 +240,23 @@ public class TokenUtil {
     public Boolean isRefreshToken(String token) {
         final String refresh = getRefreshFromToken(token);
         return (refresh != null && refresh.equals("true"));
+    }
+
+    public Boolean isRememberMeToken(String token) {
+        Object rememberMe = getAllClaimsFromToken(token).get(CLAIM_KEY_REMEMBER_ME);
+        if (rememberMe instanceof Boolean rememberMeFlag) {
+            return rememberMeFlag;
+        }
+        return "true".equals(String.valueOf(rememberMe));
+    }
+
+    public String generateRefreshToken(ExtendedAuthUser userDetails, boolean rememberMe) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put(CLAIM_KEY_REFRESH, true);
+        claims.put(CLAIM_KEY_REMEMBER_ME, rememberMe);
+
+        Long expiration = rememberMe ? expirationRememberMeRefreshToken : expirationRefreshToken;
+        return doGenerateUserToken(claims, userDetails.getUsername(), expiration);
     }
 
     /**

@@ -1,0 +1,227 @@
+import { DOCUMENT, isPlatformBrowser } from '@angular/common';
+import { Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { AuthApiService, LoginResponseDto } from './auth-api.service';
+
+const ACCESS_TOKEN_COOKIE = 'portfolio_creator_access_token';
+const REFRESH_TOKEN_COOKIE = 'portfolio_creator_refresh_token';
+const USER_COOKIE = 'portfolio_creator_user';
+const PROVIDER_COOKIE = 'portfolio_creator_provider';
+const REMEMBER_ME_COOKIE = 'portfolio_creator_remember_me';
+const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
+
+export interface SessionUser {
+  email?: string | null;
+  username: string;
+  avatarUrl?: string | null;
+}
+
+interface SessionState {
+  accessToken?: string | null;
+  refreshToken?: string | null;
+  provider: 'credentials' | 'google';
+  rememberMe: boolean;
+  user: SessionUser;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthSessionService {
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly document = inject(DOCUMENT);
+  private readonly authApiService = inject(AuthApiService);
+
+  private readonly sessionState = signal<SessionState | null>(null);
+
+  readonly user = computed(() => this.sessionState()?.user ?? null);
+  readonly authenticated = computed(() => this.sessionState() !== null);
+
+  async initializeSession() {
+    if (!this.isBrowser()) {
+      return;
+    }
+
+    const accessToken = this.readCookie(ACCESS_TOKEN_COOKIE);
+    const refreshToken = this.readCookie(REFRESH_TOKEN_COOKIE);
+    const rememberedSession = this.readCookie(REMEMBER_ME_COOKIE) === 'true';
+    const user = this.readUserCookie();
+    const provider = this.readProviderCookie();
+
+    if (accessToken && user && !this.isJwtExpired(accessToken)) {
+      this.sessionState.set({
+        accessToken,
+        refreshToken,
+        provider,
+        rememberMe: rememberedSession,
+        user
+      });
+      return;
+    }
+
+    if (refreshToken) {
+      try {
+        const response = await firstValueFrom(this.authApiService.refreshSession(refreshToken));
+        this.saveLoginSession(response, {
+          rememberMe: rememberedSession,
+          provider
+        });
+        return;
+      } catch {
+        this.clearSession();
+        return;
+      }
+    }
+
+    this.clearSession();
+  }
+
+  saveLoginSession(
+    response: LoginResponseDto,
+    options?: { rememberMe?: boolean; provider?: 'credentials' | 'google' }
+  ) {
+    const rememberMe = Boolean(options?.rememberMe);
+    const session: SessionState = {
+      accessToken: response.accessToken,
+      refreshToken: response.refreshToken,
+      provider: options?.provider ?? 'credentials',
+      rememberMe,
+      user: {
+        email: response.user.email,
+        username: response.user.username,
+        avatarUrl: response.user.avatarUrl
+      }
+    };
+
+    this.persistSession(session);
+  }
+
+  getUser() {
+    return this.user();
+  }
+
+  isAuthenticated() {
+    return this.authenticated();
+  }
+
+  getAccessToken() {
+    return this.sessionState()?.accessToken ?? this.readCookie(ACCESS_TOKEN_COOKIE);
+  }
+
+  getRefreshToken() {
+    return this.sessionState()?.refreshToken ?? this.readCookie(REFRESH_TOKEN_COOKIE);
+  }
+
+  clearSession() {
+    if (this.isBrowser()) {
+      this.deleteCookie(ACCESS_TOKEN_COOKIE);
+      this.deleteCookie(REFRESH_TOKEN_COOKIE);
+      this.deleteCookie(USER_COOKIE);
+      this.deleteCookie(PROVIDER_COOKIE);
+      this.deleteCookie(REMEMBER_ME_COOKIE);
+    }
+
+    this.sessionState.set(null);
+  }
+
+  private persistSession(session: SessionState) {
+    if (!this.isBrowser()) {
+      this.sessionState.set(session);
+      return;
+    }
+
+    const maxAge = session.rememberMe ? THIRTY_DAYS_IN_SECONDS : undefined;
+
+    if (session.accessToken) {
+      this.writeCookie(ACCESS_TOKEN_COOKIE, session.accessToken, maxAge);
+    } else {
+      this.deleteCookie(ACCESS_TOKEN_COOKIE);
+    }
+
+    if (session.refreshToken) {
+      this.writeCookie(REFRESH_TOKEN_COOKIE, session.refreshToken, maxAge);
+    } else {
+      this.deleteCookie(REFRESH_TOKEN_COOKIE);
+    }
+
+    this.writeCookie(USER_COOKIE, JSON.stringify(session.user), maxAge);
+    this.writeCookie(PROVIDER_COOKIE, session.provider, maxAge);
+
+    if (session.rememberMe) {
+      this.writeCookie(REMEMBER_ME_COOKIE, 'true', THIRTY_DAYS_IN_SECONDS);
+    } else {
+      this.deleteCookie(REMEMBER_ME_COOKIE);
+    }
+
+    this.sessionState.set(session);
+  }
+
+  private writeCookie(name: string, value: string, maxAgeSeconds?: number) {
+    const secureAttribute =
+      typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
+    const maxAgeAttribute =
+      typeof maxAgeSeconds === 'number' ? `; Max-Age=${maxAgeSeconds}` : '';
+
+    this.document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; SameSite=Lax${maxAgeAttribute}${secureAttribute}`;
+  }
+
+  private readCookie(name: string) {
+    if (!this.isBrowser()) {
+      return null;
+    }
+
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = this.document.cookie.match(new RegExp(`(?:^|; )${escapedName}=([^;]*)`));
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  private deleteCookie(name: string) {
+    this.document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
+  }
+
+  private readUserCookie() {
+    const rawUser = this.readCookie(USER_COOKIE);
+    if (!rawUser) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(rawUser) as SessionUser;
+    } catch {
+      this.deleteCookie(USER_COOKIE);
+      return null;
+    }
+  }
+
+  private readProviderCookie(): 'credentials' | 'google' {
+    return this.readCookie(PROVIDER_COOKIE) === 'google' ? 'google' : 'credentials';
+  }
+
+  private isJwtExpired(token: string) {
+    try {
+      const payloadSegment = token.split('.')[1];
+      if (!payloadSegment) {
+        return true;
+      }
+
+      const payload = JSON.parse(this.decodeBase64Url(payloadSegment)) as { exp?: number };
+      if (!payload.exp) {
+        return true;
+      }
+
+      return payload.exp * 1000 <= Date.now();
+    } catch {
+      return true;
+    }
+  }
+
+  private decodeBase64Url(value: string) {
+    const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    return window.atob(padded);
+  }
+
+  private isBrowser() {
+    return isPlatformBrowser(this.platformId);
+  }
+}

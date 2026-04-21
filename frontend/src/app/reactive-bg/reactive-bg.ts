@@ -1,9 +1,14 @@
 import {
+  AfterViewInit,
   Component,
   ElementRef,
+  HostListener,
+  OnDestroy,
+  PLATFORM_ID,
   ViewChild,
-  HostListener
+  inject
 } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 
 interface Hex {
   x: number;
@@ -24,12 +29,17 @@ interface Wave {
 @Component({
   selector: 'app-reactive-bg',
   templateUrl: './reactive-bg.html',
-  styleUrls: ['./reactive-bg.scss'],
+  styleUrls: ['./reactive-bg.scss']
 })
-export class ReactiveBg {
+export class ReactiveBg implements AfterViewInit, OnDestroy {
+  @ViewChild('canvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
 
-  @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
-  ctx!: CanvasRenderingContext2D;
+  private readonly platformId = inject(PLATFORM_ID);
+
+  private ctx: CanvasRenderingContext2D | null = null;
+  private animationFrameId: number | null = null;
+  private waveIntervalId: number | null = null;
+  private isRunning = false;
 
   hexes: Hex[] = [];
   waves: Wave[] = [];
@@ -38,47 +48,93 @@ export class ReactiveBg {
   stroke = 1;
   timeBetweenWaves = 1800;
 
-  @HostListener('window:load')
-  onLoad() {
-    this.resize();
-    this.createHexGrid();
-    this.animate();
-    setInterval(() => this.spawnWave(), this.timeBetweenWaves);
+  ngAfterViewInit() {
+    if (!this.isBrowser()) {
+      return;
+    }
+
+    this.start();
+  }
+
+  ngOnDestroy() {
+    if (!this.isBrowser()) {
+      return;
+    }
+
+    this.stop();
   }
 
   @HostListener('window:resize')
-  resize() {
-    const c = this.canvasRef.nativeElement;
-    c.width = window.innerWidth;
-    c.height = window.innerHeight;
+  onResize() {
+    if (!this.isRunning) {
+      return;
+    }
+
+    this.resizeCanvas();
     this.createHexGrid();
   }
 
-  createHexGrid() {
-    const c = this.canvasRef.nativeElement;
-    this.ctx = c.getContext('2d')!;
-    this.hexes = [];
+  private start() {
+    this.stop();
+    this.resizeCanvas();
+    this.createHexGrid();
+    this.spawnWave();
+    this.isRunning = true;
+    this.waveIntervalId = window.setInterval(() => this.spawnWave(), this.timeBetweenWaves);
+    this.animate();
+  }
 
-    const r = this.hexRadius;
-    const w = Math.sqrt(3) * r;
-    const h = 2 * r;
-    const vStep = 1.5 * r;
+  private stop() {
+    this.isRunning = false;
+
+    if (this.waveIntervalId !== null) {
+      window.clearInterval(this.waveIntervalId);
+      this.waveIntervalId = null;
+    }
+
+    if (this.animationFrameId !== null) {
+      window.cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+  }
+
+  private resizeCanvas() {
+    const canvas = this.canvasRef.nativeElement;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  private createHexGrid() {
+    const canvas = this.canvasRef.nativeElement;
+    this.ctx = canvas.getContext('2d');
+
+    if (!this.ctx) {
+      return;
+    }
+
+    this.hexes = [];
+    this.waves = [];
+
+    const radius = this.hexRadius;
+    const hexWidth = Math.sqrt(3) * radius;
+    const hexHeight = 2 * radius;
+    const verticalStep = 1.5 * radius;
 
     let row = 0;
-    for (let y = r; y < c.height + h; y += vStep) {
-      const offsetX = row % 2 === 0 ? 0 : w / 2;
-      for (let x = offsetX; x < c.width + w; x += w) {
+    for (let y = radius; y < canvas.height + hexHeight; y += verticalStep) {
+      const offsetX = row % 2 === 0 ? 0 : hexWidth / 2;
+      for (let x = offsetX; x < canvas.width + hexWidth; x += hexWidth) {
         this.hexes.push({ x, y, ox: x, oy: y });
       }
       row++;
     }
   }
 
-  spawnWave() {
-    const c = this.canvasRef.nativeElement;
+  private spawnWave() {
+    const canvas = this.canvasRef.nativeElement;
     this.waves.push({
-      x: Math.random() * c.width,
-      y: Math.random() * c.height,
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
       radius: 0,
       baseStrength: 22,
       age: 0,
@@ -86,66 +142,75 @@ export class ReactiveBg {
     });
   }
 
-  drawHex(x: number, y: number, r: number) {
-    const ctx = this.ctx;
-    ctx.beginPath();
-
-    for (let i = 0; i < 6; i++) {
-      const angle = Math.PI / 3 * i + Math.PI / 6;
-      const px = x + Math.cos(angle) * r;
-      const py = y + Math.sin(angle) * r;
-      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  private drawHex(x: number, y: number, radius: number) {
+    if (!this.ctx) {
+      return;
     }
 
-    ctx.closePath();
-    ctx.stroke();
+    this.ctx.beginPath();
+
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 3) * i + Math.PI / 6;
+      const pointX = x + Math.cos(angle) * radius;
+      const pointY = y + Math.sin(angle) * radius;
+      i === 0 ? this.ctx.moveTo(pointX, pointY) : this.ctx.lineTo(pointX, pointY);
+    }
+
+    this.ctx.closePath();
+    this.ctx.stroke();
   }
 
-  animate = () => {
-    const c = this.canvasRef.nativeElement;
-    this.ctx.clearRect(0, 0, c.width, c.height);
+  private animate = () => {
+    if (!this.isRunning || !this.ctx) {
+      return;
+    }
 
-    this.waves.forEach(w => {
-      w.radius += 1.1;
-      w.age += 1;
+    const canvas = this.canvasRef.nativeElement;
+    this.ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    this.waves.forEach((wave) => {
+      wave.radius += 1.1;
+      wave.age += 1;
     });
 
-    // rimuovi onde scadute
-    this.waves = this.waves.filter(w => w.age <= w.life && w.radius < 800);
+    this.waves = this.waves.filter((wave) => wave.age <= wave.life && wave.radius < 800);
 
     this.ctx.strokeStyle = '#005B41';
     this.ctx.lineWidth = this.stroke;
     this.ctx.lineJoin = 'round';
     this.ctx.lineCap = 'round';
 
-    for (const h of this.hexes) {
+    for (const hex of this.hexes) {
       let offsetX = 0;
       let offsetY = 0;
 
-      for (const w of this.waves) {
-        const dx = h.ox - w.x;
-        const dy = h.oy - w.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const diff = Math.abs(dist - w.radius);
+      for (const wave of this.waves) {
+        const dx = hex.ox - wave.x;
+        const dy = hex.oy - wave.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const distanceFromWave = Math.abs(distance - wave.radius);
 
-        if (diff < 18) {
-          const t = Math.min(1, w.age / 40);
-          const fade = 1 - Math.min(1, w.age / w.life);
-          const smooth = t * t * (3 - 2 * t);
-          const strength = w.baseStrength * smooth * fade;
+        if (distanceFromWave < 18 && distance > 0) {
+          const growIn = Math.min(1, wave.age / 40);
+          const fadeOut = 1 - Math.min(1, wave.age / wave.life);
+          const smoothGrow = growIn * growIn * (3 - 2 * growIn);
+          const strength = wave.baseStrength * smoothGrow * fadeOut;
+          const force = (1 - distanceFromWave / 18) * strength;
 
-          const force = (1 - diff / 18) * strength;
-          offsetX += (dx / dist) * force;
-          offsetY += (dy / dist) * force;
+          offsetX += (dx / distance) * force;
+          offsetY += (dy / distance) * force;
         }
       }
 
-      h.x += (h.ox + offsetX - h.x) * 0.07;
-      h.y += (h.oy + offsetY - h.y) * 0.07;
-
-      this.drawHex(h.x, h.y, this.hexRadius);
+      hex.x += (hex.ox + offsetX - hex.x) * 0.07;
+      hex.y += (hex.oy + offsetY - hex.y) * 0.07;
+      this.drawHex(hex.x, hex.y, this.hexRadius);
     }
 
-    requestAnimationFrame(this.animate);
+    this.animationFrameId = window.requestAnimationFrame(this.animate);
   };
+
+  private isBrowser() {
+    return isPlatformBrowser(this.platformId);
+  }
 }

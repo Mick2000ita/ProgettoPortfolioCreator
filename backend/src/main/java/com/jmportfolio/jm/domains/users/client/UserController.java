@@ -1,11 +1,15 @@
 package com.jmportfolio.jm.domains.users.client;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.jmportfolio.jm.core.auth.model.ExtendedAuthUser;
 import com.jmportfolio.jm.domains.users.application.UserService;
 import com.jmportfolio.jm.domains.users.client.dto.RegisterUserDto;
+import com.jmportfolio.jm.domains.users.client.dto.UserProfileDto;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +27,12 @@ public class UserController {
     @PostMapping("/register")
     public void registerUser(@RequestBody RegisterUserDto dto) {
         userService.registerUser(dto);
+    }
+
+    @GetMapping("/me")
+    public UserProfileDto getCurrentUserProfile(
+            @AuthenticationPrincipal ExtendedAuthUser authenticatedUser) {
+        return userService.getProfileByUsername(authenticatedUser.getUsername());
     }
     
 }

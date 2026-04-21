@@ -30,6 +30,13 @@ public class UserRepository {
     }
 
     @Transactional
+    public User findByUsername(String username) {
+        return userJpaRepo.findByUsername(username)
+                .map(UserJpaMapper::entityToModel)
+                .orElse(null);
+    }
+
+    @Transactional
     public User save(User user) {
         var entity = UserJpaMapper.modelToEntity(user);
         return UserJpaMapper.entityToModel(userJpaRepo.save(entity));

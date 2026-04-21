@@ -1,0 +1,247 @@
+.new-portfolio-shell {
+  min-height: 100vh;
+  padding: 2rem;
+  color: #eff6f2;
+}
+
+.intro-card {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+  padding: 1.8rem;
+  border-radius: 1.75rem;
+  background: rgba(9, 17, 18, 0.72);
+  border: 1px solid rgba(186, 220, 206, 0.12);
+}
+
+.eyebrow {
+  display: inline-flex;
+  justify-self: start;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(0, 91, 65, 0.18);
+  color: #83d1b4;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+}
+
+.intro-card h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 4vw, 4rem);
+  line-height: 1;
+  max-width: 12ch;
+}
+
+.intro-card p {
+  margin: 0;
+  max-width: 48rem;
+  color: #c3d5cf;
+  line-height: 1.7;
+}
+
+.intro-card code {
+  color: #8ed6bc;
+}
+
+.portfolio-form {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.form-section {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.25rem;
+  border-radius: 1.45rem;
+  background: rgba(8, 14, 15, 0.72);
+  border: 1px solid rgba(186, 220, 206, 0.08);
+}
+
+.form-section h2,
+.form-section h3 {
+  margin: 0;
+}
+
+.field-block {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.field-block span {
+  color: #eff6f2;
+}
+
+.field-block small {
+  color: #9fb4ad;
+}
+
+.slug-preview {
+  color: #c3d5cf;
+}
+
+.slug-preview strong {
+  color: #8ed6bc;
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.section-copy {
+  max-width: 38rem;
+}
+
+.add-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.content-select {
+  min-width: 13rem;
+  min-height: 2.9rem;
+  padding: 0 0.85rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(145, 167, 158, 0.24);
+  background: rgba(8, 12, 13, 0.78);
+  color: #f7fffb;
+}
+
+.contents-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.empty-content-state strong {
+  color: #eff6f2;
+}
+
+.empty-content-state p {
+  color: #c3d5cf;
+}
+
+.content-section {
+  background: rgba(9, 17, 18, 0.72);
+}
+
+.content-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+}
+
+.content-type {
+  display: inline-flex;
+  margin-bottom: 0.45rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(131, 209, 180, 0.12);
+  color: #8ed6bc;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.remove-button {
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 138, 138, 0.18);
+  background: rgba(98, 24, 24, 0.18);
+  color: #f2cbcb;
+  cursor: pointer;
+}
+
+.color-input {
+  width: 100%;
+  min-height: 3rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(186, 220, 206, 0.14);
+  background: transparent;
+}
+
+.helper-box {
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  background: rgba(131, 209, 180, 0.08);
+  color: #d6ebe2;
+}
+
+.helper-section strong {
+  color: #eff6f2;
+  font-size: 1.05rem;
+}
+
+.helper-section p {
+  color: #c3d5cf;
+}
+
+.helper-box-error {
+  background: rgba(122, 37, 37, 0.22);
+  color: #ffd9d9;
+}
+
+.helper-section-error {
+  background: rgba(122, 37, 37, 0.18);
+  border-color: rgba(214, 138, 138, 0.18);
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.4rem;
+}
+
+.preview-grid img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 1rem;
+  border: 1px solid rgba(186, 220, 206, 0.14);
+}
+
+.actions-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.back-link {
+  text-decoration: none;
+}
+
+:host ::ng-deep .field-block .p-inputtext,
+:host ::ng-deep .field-block .p-textarea {
+  width: 100%;
+  border-radius: 0.95rem;
+  background: rgba(8, 12, 13, 0.78);
+  border-color: rgba(145, 167, 158, 0.24);
+  color: #f7fffb;
+}
+
+@media (max-width: 920px) {
+  .new-portfolio-shell {
+    padding: 1.15rem;
+  }
+
+  .actions-row,
+  .add-row,
+  .section-head,
+  .content-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .content-select {
+    width: 100%;
+  }
+}

@@ -1,0 +1,49 @@
+<div class="app-shell">
+  <aside class="side-nav">
+    <a
+      routerLink="/profile"
+      routerLinkActive="active-link"
+      [routerLinkActiveOptions]="{ exact: true }"
+      class="profile-link"
+    >
+      <div class="chip-avatar">
+        @if (user()?.avatarUrl) {
+          <img [src]="user()?.avatarUrl" [alt]="user()?.username || 'Avatar utente'" />
+        } @else {
+          <span>{{ user()?.username?.charAt(0) || 'U' }}</span>
+        }
+      </div>
+
+      <div class="profile-link-copy">
+        <strong>{{ user()?.username || 'Utente' }}</strong>
+        <span>{{ user()?.email || 'Profilo attivo' }}</span>
+      </div>
+    </a>
+
+    <nav class="nav-links">
+      <a
+        routerLink="/home"
+        routerLinkActive="active-link"
+        [routerLinkActiveOptions]="{ exact: true }"
+        class="nav-link"
+      >
+        <span class="pi pi-home"></span>
+        <span>Home</span>
+      </a>
+
+      <a routerLink="/portfolios" routerLinkActive="active-link" class="nav-link">
+        <span class="pi pi-briefcase"></span>
+        <span>Portfolio</span>
+      </a>
+    </nav>
+
+    <button type="button" class="nav-link nav-link-button logout-link" (click)="logout()">
+      <span class="pi pi-sign-out"></span>
+      <span>Logout</span>
+    </button>
+  </aside>
+
+  <main class="content-shell">
+    <router-outlet />
+  </main>
+</div>

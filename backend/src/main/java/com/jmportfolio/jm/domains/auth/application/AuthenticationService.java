@@ -41,6 +41,7 @@ public class AuthenticationService {
     @Transactional
     public LoginResponseDto login(LoginRequestDto loginRequest) {
         String username = loginRequest.getUsername();
+        boolean rememberMe = Boolean.TRUE.equals(loginRequest.getRememberMe());
 
         jwtuserDetailsService.authenticate(username, loginRequest.getPassword());
 
@@ -51,7 +52,7 @@ public class AuthenticationService {
         updateUserLastLoginByUsername(user);
 
         final String accessToken = jwtTokenUtil.generateUserToken(userDetails);
-        final String refreshToken = jwtTokenUtil.refreshUserToken(accessToken);
+        final String refreshToken = jwtTokenUtil.generateRefreshToken(userDetails, rememberMe);
 
         return new LoginResponseDto(accessToken, refreshToken,
                 UserJpaMapper.entityToModel(user));
@@ -95,7 +96,8 @@ public class AuthenticationService {
         log.info("New Access and Refresh token for user {}", userDetails.getUsername());
 
         final String newAccessToken = jwtTokenUtil.generateUserToken(userDetails);
-        final String newRefreshToken = jwtTokenUtil.refreshUserToken(newAccessToken);
+        final boolean rememberMe = jwtTokenUtil.isRememberMeToken(refreshToken);
+        final String newRefreshToken = jwtTokenUtil.generateRefreshToken(userDetails, rememberMe);
 
         return new LoginInternalResponse(newAccessToken, newRefreshToken);
     }

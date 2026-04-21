@@ -1,18 +1,19 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
 
-import { TestButton } from './test-button.component';
+import { TestButtonComponent } from './test-button.component';
 
 describe('TestButton', () => {
-  let component: TestButton;
-  let fixture: ComponentFixture<TestButton>;
+  let component: TestButtonComponent;
+  let fixture: ComponentFixture<TestButtonComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [TestButton]
-    })
-    .compileComponents();
+      imports: [TestButtonComponent],
+      providers: [provideHttpClient()]
+    }).compileComponents();
 
-    fixture = TestBed.createComponent(TestButton);
+    fixture = TestBed.createComponent(TestButtonComponent);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });

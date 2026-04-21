@@ -14,7 +14,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,7 +27,7 @@ import lombok.ToString;
 @Table(name = "portfolios")
 @Getter
 @Setter
-@ToString
+@ToString(exclude = "userJpaEntity")
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
@@ -51,7 +51,7 @@ public class PortfolioJpaEntity extends BaseJpaEntity {
     @Column(name = "is_public")
     private boolean isPublic;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private UserJpaEntity userJpaEntity;
 }

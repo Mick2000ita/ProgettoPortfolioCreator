@@ -1,0 +1,87 @@
+<div class="home-shell">
+  <section class="hero-section">
+    <div class="hero-copy">
+      <div class="eyebrow">Home</div>
+      <h1>Scopri portfolio che fanno venir voglia di aprirli tutti.</h1>
+      <p>
+        Questa home mette in evidenza diversi stili di portfolio e li presenta in rotazione, così
+        puoi immaginare da subito come potrebbero apparire i tuoi contenuti.
+      </p>
+
+      <div class="hero-actions">
+        @if (!isAuthenticated()) {
+          <a routerLink="/login" class="cta-link">
+            <p-button label="Vai al login" icon="pi pi-sign-in" />
+          </a>
+        }
+      </div>
+    </div>
+
+    <div class="portfolio-stage">
+      <div class="stage-card" [style.background]="activePortfolio().accent">
+        <div class="stage-header">
+          <span class="stage-pill">{{ activePortfolio().discipline }}</span>
+          <span class="stage-owner">{{ activePortfolio().owner }}</span>
+        </div>
+
+        <div class="stage-copy">
+          <h2>{{ activePortfolio().title }}</h2>
+          <p>{{ activePortfolio().description }}</p>
+        </div>
+
+        <div class="stage-tags">
+          @for (tag of activePortfolio().tags; track tag) {
+            <span>{{ tag }}</span>
+          }
+        </div>
+
+        <div class="stage-stats">
+          @for (stat of activePortfolio().stats; track stat.label) {
+            <div class="stat-card">
+              <strong>{{ stat.value }}</strong>
+              <span>{{ stat.label }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="selector-grid">
+    @for (portfolio of portfolios; track portfolio.title; let index = $index) {
+      <button
+        type="button"
+        class="selector-card"
+        [class.selector-card-active]="index === activeIndex()"
+        (click)="selectPortfolio(index)"
+      >
+        <div class="selector-accent" [style.background]="portfolio.accent"></div>
+        <div class="selector-copy">
+          <strong>{{ portfolio.title }}</strong>
+          <span>{{ portfolio.discipline }}</span>
+          <p>{{ portfolio.description }}</p>
+        </div>
+      </button>
+    }
+  </section>
+
+  <section class="inspiration-strip">
+    <article class="inspiration-card">
+      <span class="pi pi-images"></span>
+      <strong>Gallerie immersive</strong>
+      <p>Layout pensati per foto, visual e cover project con molto respiro.</p>
+    </article>
+
+    <article class="inspiration-card">
+      <span class="pi pi-chart-line"></span>
+      <strong>Casi studio misurabili</strong>
+      <p>Sezioni dedicate a risultati, metriche e processo per portfolio orientati al prodotto.</p>
+    </article>
+
+    <article class="inspiration-card">
+      <span class="pi pi-sparkles"></span>
+      <strong>Direzioni visive diverse</strong>
+      <p>Ogni esempio mostra un tono differente, dal minimal tecnico all’editoriale creativo.</p>
+    </article>
+  </section>
+</div>

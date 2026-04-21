@@ -1,0 +1,280 @@
+<div class="editor-shell">
+  <form class="editor-form" [formGroup]="portfolioForm" (ngSubmit)="submit()">
+    <section class="editor-topbar">
+      <div class="topbar-copy">
+        <div class="eyebrow">Editor portfolio</div>
+        <h1>Lavora sul portfolio in uno spazio dedicato.</h1>
+        <p>
+          Questo editor prende il setup iniziale e lo trasforma in un ambiente di lavoro piu'
+          flessibile, con contenuti, salvataggio e preview in tempo reale.
+        </p>
+      </div>
+
+      <div class="topbar-actions">
+        <a routerLink="/portfolios" class="topbar-link">
+          <p-button label="I tuoi portfolio" icon="pi pi-arrow-left" [outlined]="true" />
+        </a>
+
+        <p-button
+          type="button"
+          label="Apri preview"
+          icon="pi pi-eye"
+          [outlined]="true"
+          (onClick)="openPublicPreview()"
+        />
+
+        <p-button
+          type="submit"
+          label="Salva modifiche"
+          icon="pi pi-check"
+          [loading]="isSubmitting()"
+        />
+      </div>
+    </section>
+
+    @if (isLoadingPortfolio()) {
+      <section class="feedback-card">
+        <strong>Caricamento editor in corso...</strong>
+        <p>Sto recuperando il portfolio e preparando l'area di lavoro.</p>
+      </section>
+    } @else if (loadError()) {
+      <section class="feedback-card feedback-card-error">
+        <strong>Non riesco ad aprire questo portfolio.</strong>
+        <p>{{ loadError() }}</p>
+      </section>
+    } @else {
+      <section class="editor-grid">
+        <aside class="editor-sidebar">
+          <div class="sidebar-card">
+            <h2>Struttura</h2>
+            <p>Usa questo pannello per aggiungere nuovi blocchi e controllare il setup del portfolio.</p>
+
+            <label class="select-label">
+              <span>Nuovo contenuto</span>
+              <select
+                class="content-select"
+                [value]="selectedContentType()"
+                (change)="setSelectedContentType($any($event.target).value)"
+              >
+                @for (option of contentOptions; track option.value) {
+                  <option [value]="option.value">{{ option.label }}</option>
+                }
+              </select>
+            </label>
+
+            <p-button
+              type="button"
+              label="Aggiungi blocco"
+              icon="pi pi-plus"
+              (onClick)="addSelectedContent()"
+            />
+          </div>
+
+          <div class="sidebar-card metrics-card">
+            <h2>Snapshot</h2>
+            <div class="metric-row">
+              <span>Blocchi totali</span>
+              <strong>{{ moduleCount() }}</strong>
+            </div>
+            <div class="metric-row">
+              <span>Titoli</span>
+              <strong>{{ titleModulesCount() }}</strong>
+            </div>
+            <div class="metric-row">
+              <span>Descrizioni</span>
+              <strong>{{ descriptionModulesCount() }}</strong>
+            </div>
+            <div class="metric-row">
+              <span>Gallerie</span>
+              <strong>{{ imageBlocksCount() }}</strong>
+            </div>
+            <div class="metric-row">
+              <span>CV</span>
+              <strong>{{ cvBlocksCount() }}</strong>
+            </div>
+          </div>
+
+          <div class="sidebar-card">
+            <h2>Ordine contenuti</h2>
+
+            @if (contentsArray.length === 0) {
+              <p class="sidebar-empty">
+                Nessun blocco presente. Aggiungine uno per iniziare a comporre il portfolio.
+              </p>
+            } @else {
+              <div class="content-outline">
+                @for (content of contentsArray.controls; track trackContent($index, content); let index = $index) {
+                  <button type="button" class="outline-item" (click)="removeContent(index)">
+                    <span>{{ index + 1 }}. {{ getContentTypeLabel(content.controls.type.value) }}</span>
+                    <small>Rimuovi</small>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </aside>
+
+        <section class="editor-canvas">
+          <div class="canvas-card identity-card">
+            <div>
+              <div class="section-tag">Identita'</div>
+              <h2>Nome e URL</h2>
+            </div>
+
+            <label class="field-block">
+              <span>Nome del portfolio</span>
+              <input pInputText formControlName="title" placeholder="Es. marco-rinaldi" />
+            </label>
+
+            <div class="slug-preview">
+              URL live:
+              <strong>/{{ slugPreview() || 'nome-portfolio' }}</strong>
+            </div>
+          </div>
+
+          <div class="canvas-card">
+            <div class="section-head">
+              <div>
+                <div class="section-tag">Workspace</div>
+                <h2>Contenuti del portfolio</h2>
+              </div>
+              <p>
+                Qui modifichi i blocchi attuali. Il layout e' pensato per lavorare sul portfolio,
+                non piu' solo sul setup iniziale.
+              </p>
+            </div>
+
+            <div class="content-stack" formArrayName="contents">
+              @if (contentsArray.length === 0) {
+                <section class="content-card empty-state">
+                  <strong>Nessun contenuto disponibile.</strong>
+                  <p>Usa la colonna laterale per aggiungere i primi blocchi all'editor.</p>
+                </section>
+              }
+
+              @for (content of contentsArray.controls; track trackContent($index, content); let index = $index) {
+                <section class="content-card" [formGroupName]="index">
+                  <div class="content-card-head">
+                    <div>
+                      <span class="content-type">{{ getContentTypeLabel(content.controls.type.value) }}</span>
+                      <h3>{{ content.controls.label.value }}</h3>
+                    </div>
+
+                    <button type="button" class="remove-button" (click)="removeContent(index)">
+                      Rimuovi
+                    </button>
+                  </div>
+
+                  @if (isType(content, 'title')) {
+                    <label class="field-block">
+                      <span>Titolo</span>
+                      <input pInputText formControlName="textValue" placeholder="Titolo principale" />
+                    </label>
+                  }
+
+                  @if (isType(content, 'description')) {
+                    <label class="field-block">
+                      <span>Descrizione</span>
+                      <textarea
+                        pTextarea
+                        formControlName="textValue"
+                        rows="5"
+                        placeholder="Scrivi una descrizione piu' editoriale, narrativa o tecnica."
+                      ></textarea>
+                    </label>
+                  }
+
+                  @if (isType(content, 'background')) {
+                    <label class="field-block">
+                      <span>Background</span>
+                      <input type="color" class="color-input" formControlName="colorValue" />
+                    </label>
+                  }
+
+                  @if (isType(content, 'cv')) {
+                    <label class="field-block">
+                      <span>CV (PDF)</span>
+                      <input type="file" accept="application/pdf" (change)="onCvSelected(index, $event)" />
+                      @if (content.controls.fileName.value) {
+                        <small>{{ content.controls.fileName.value }}</small>
+                      }
+                    </label>
+
+                    @if (isExtractingCv()) {
+                      <div class="helper-box">Sto rileggendo il PDF e mantenendo la formattazione.</div>
+                    }
+
+                    @if (extractionError()) {
+                      <div class="helper-box helper-box-error">{{ extractionError() }}</div>
+                    }
+
+                    <label class="field-block">
+                      <span>Testo CV</span>
+                      <textarea
+                        pTextarea
+                        formControlName="textValue"
+                        rows="12"
+                        placeholder="Il testo estratto dal CV apparira' qui."
+                      ></textarea>
+                    </label>
+                  }
+
+                  @if (isType(content, 'image')) {
+                    <label class="field-block">
+                      <span>Immagini</span>
+                      <input type="file" accept="image/*" multiple (change)="onImagesSelected(index, $event)" />
+                    </label>
+
+                    @if (content.controls.images.value.length > 0) {
+                      <div class="preview-grid">
+                        @for (image of content.controls.images.value; track image; let imageIndex = $index) {
+                          <figure class="image-card">
+                            <img [src]="image" alt="Anteprima immagine" />
+                            <button type="button" class="image-remove" (click)="removeImage(index, imageIndex)">
+                              Rimuovi
+                            </button>
+                          </figure>
+                        }
+                      </div>
+                    }
+                  }
+                </section>
+              }
+            </div>
+          </div>
+        </section>
+
+        <aside class="editor-preview">
+          <div class="preview-card" [style.background]="previewBackground()">
+            <div class="preview-card-inner">
+              <div class="section-tag preview-tag">Preview rapida</div>
+
+              @if (previewTitles().length > 0) {
+                @for (title of previewTitles(); track title) {
+                  <h2>{{ title }}</h2>
+                }
+              } @else {
+                <h2>{{ portfolioForm.controls.title.value || 'Titolo portfolio' }}</h2>
+              }
+
+              @if (previewDescriptions().length > 0) {
+                @for (description of previewDescriptions(); track description) {
+                  <p>{{ description }}</p>
+                }
+              } @else {
+                <p>
+                  Aggiungi descrizioni nell'editor per vedere subito il tono generale del portfolio.
+                </p>
+              }
+
+              <div class="preview-meta">
+                <span>/{{ slugPreview() || 'nome-portfolio' }}</span>
+                <span>{{ moduleCount() }} blocchi</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </section>
+    }
+  </form>
+</div>

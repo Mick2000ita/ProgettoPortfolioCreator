@@ -1,81 +1,106 @@
-@if (true) {
-<div class="center">
-  <p-card class="shadow-6 border-round-xl center-title card-color" contentStyleClass="pt-4 "  ngSkipHydration>
-<ng-template #header> 
-  <div class="card-header">
-<p-toast 
-  [key]="'registerToast'" 
-  [position]="isSmallScreen ? 'top-center' : 'top-right'" 
-  [breakpoints]="{ '920px': { width: 'auto' } }">
-</p-toast>
-    <div class="header-slot">
-      @if (registrationFormVisible) {
-        <p-button icon="pi pi-arrow-left" [outlined]="true" [rounded]="true" (onClick)="openRegisterForm()"></p-button>
-      }
-    </div>
-    <div class="header-title">
-      Portfolio Creator
-    </div>
-    <div class="header-slot"></div>
+<app-reactive-bg></app-reactive-bg>
 
-  </div>
-</ng-template>
- 
+<p-toast
+  [key]="'authToast'"
+  [position]="isSmallScreen ? 'top-center' : 'top-right'"
+  [breakpoints]="{ '920px': { width: 'min(92vw, 26rem)' } }"
+/>
 
-    <div class="flex flex-column align-items-center gap-3">
-      <div class="content-spacing-vertical">
-        <p-floatlabel>
-          <input id="username" pInputText [(ngModel)]="user" autocomplete="on" />
+<div class="auth-shell">
+  <p-card class="auth-card shadow-6">
+    <div class="card-head">
+      <div class="head-badge">{{ isRegisterMode ? 'Nuovo account' : 'Bentornato' }}</div>
+      <h1>Portfolio Creator</h1>
+      <p>
+        {{
+          isRegisterMode
+            ? 'Crea il tuo account per iniziare a costruire e pubblicare il portfolio.'
+            : 'Accedi per tornare alla tua area personale e gestire i tuoi progetti.'
+        }}
+      </p>
+    </div>
+
+    <form class="auth-form" [formGroup]="authForm" (ngSubmit)="submit()">
+      <div class="field">
+        <p-floatlabel variant="on">
+          <input id="username" pInputText formControlName="username" autocomplete="username" />
           <label for="username">Username</label>
         </p-floatlabel>
       </div>
-      @if(registrationFormVisible){
-        <div class="content-spacing-vertical">
-          <p-floatlabel>
-            <input id="email" pInputText [(ngModel)]="email" type="email" autocomplete="on" />
+
+      @if (isRegisterMode) {
+        <div class="field">
+          <p-floatlabel variant="on">
+            <input id="email" pInputText formControlName="email" autocomplete="email" />
             <label for="email">Email</label>
           </p-floatlabel>
         </div>
       }
-      <div class="content-spacing-vertical">
-        <p-floatlabel>
-          <input id="password" pInputText [(ngModel)]="password" type="password" autocomplete="on" />
+
+      <div class="field">
+        <p-floatlabel variant="on">
+          <input
+            id="password"
+            pInputText
+            formControlName="password"
+            type="password"
+            [attr.autocomplete]="isRegisterMode ? 'new-password' : 'current-password'"
+          />
           <label for="password">Password</label>
         </p-floatlabel>
       </div>
-      <div class="content-spacing-vertical">
-          @if (registrationFormVisible) {
-        <p-floatlabel>
-          <input id="confirmPassword" pInputText [(ngModel)]="confirmPassword" type="password" autocomplete="on" />
-          <label for="confirmPassword">Confirm Password</label>
-        </p-floatlabel>
-          }
-      </div>
-      <div class="center-title content-spacing-vertical">
-        <div class="content-spacing-vertical">
-            @if (!registrationFormVisible) {
-          <div class="flex full-width-btn content-spacing-vertical-05">   
-            <p-button label="Login"  styleClass="button-login-color"></p-button>
-          </div>
-          <div class="flex full-width-btn content-spacing-vertical-05">
-            <p-button label="Register"  styleClass="button-register-color" (onClick)="openRegisterForm()"></p-button>
-          </div>
-           }
-           @if (registrationFormVisible) {
-          <div class="button-container">
-        <p-button label="Register"   styleClass="full-width-btn button-register-color" (onClick)="registerUser()">
-            </p-button>
-          </div>
-            
-           }          
+
+      @if (!isRegisterMode) {
+        <label class="remember-me">
+          <input type="checkbox" formControlName="rememberMe" />
+          <span>Resta connesso per 30 giorni</span>
+        </label>
+      }
+
+      @if (isRegisterMode) {
+        <div class="field">
+          <p-floatlabel variant="on">
+            <input
+              id="confirmPassword"
+              pInputText
+              formControlName="confirmPassword"
+              type="password"
+              autocomplete="new-password"
+            />
+            <label for="confirmPassword">Conferma Password</label>
+          </p-floatlabel>
         </div>
-        <div style="margin-top: 0.5rem">or</div>
+      }
+
+      <div class="actions">
+        <p-button
+          type="submit"
+          [label]="submitLabel"
+          styleClass="action-btn action-primary"
+          [loading]="isSubmitting"
+        />
+
+        <p-button
+          type="button"
+          [label]="switchLabel"
+          styleClass="action-btn action-secondary"
+          [text]="true"
+          (onClick)="toggleMode()"
+        />
       </div>
-      <div class="content-spacing-vertical">
-        <app-google-login ngSkipHydration></app-google-login>
-      </div>
+    </form>
+
+    <div class="auth-divider">
+      <span></span>
+      <small>oppure continua con</small>
+      <span></span>
+    </div>
+
+    <div class="google-section">
+      <app-google-login
+        [rememberMe]="authForm.controls.rememberMe.value"
+        (loginError)="showGoogleError($event)"
+      />
     </div>
   </p-card>
-
 </div>
-}

@@ -13,7 +13,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,7 +25,7 @@ import lombok.ToString;
 @Table(name = "users")
 @Getter
 @Setter
-@ToString
+@ToString(exclude = { "portfolios", "templates", "role" })
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
@@ -52,6 +51,6 @@ public class UserJpaEntity extends BaseJpaEntity {
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private List<UserTemplateJpaEntity> templates;
 
-    @OneToOne(mappedBy = "userJpaEntity", fetch = FetchType.LAZY)
-    private PortfolioJpaEntity portfolio;
+    @OneToMany(mappedBy = "userJpaEntity", fetch = FetchType.LAZY)
+    private List<PortfolioJpaEntity> portfolios;
 }
