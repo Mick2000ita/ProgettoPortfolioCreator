@@ -1,47 +1,124 @@
-<div class="public-shell" [style.background]="backgroundColor()">
+<div
+  class="public-shell"
+  [style.background]="backgroundColor()"
+  [style.--public-page-bg]="backgroundColor()"
+>
   @if (notFound()) {
     <section class="empty-state">
       <h1>Portfolio non trovato</h1>
       <p>Lo slug richiesto non corrisponde a nessun portfolio pubblico disponibile.</p>
     </section>
   } @else if (portfolio(); as currentPortfolio) {
-    <section class="portfolio-card">
-      @if (titleModules().length > 0) {
-        @for (module of titleModules(); track module) {
-          <h1>{{ module.value }}</h1>
-        }
+    <section class="public-canvas-shell">
+      @if (renderableModules().length > 0) {
+        <div class="public-grid">
+          @for (module of renderableModules(); track trackModule($index, module)) {
+            <ng-container
+              [ngTemplateOutlet]="publicModule"
+              [ngTemplateOutletContext]="{ $implicit: module, depth: 0 }"
+            />
+          }
+        </div>
       } @else {
-        <h1>{{ currentPortfolio.title }}</h1>
-      }
-
-      @for (module of descriptionModules(); track module) {
-        <p class="description-text">{{ module.value }}</p>
-      }
-
-      @for (module of imageModules(); track module) {
-        @if (module.values?.length) {
-          <div class="gallery-grid">
-            @for (image of module.values; track image) {
-              <img [src]="image" alt="Portfolio image" />
-            }
-          </div>
-        }
-      }
-
-      @for (module of cvModules(); track module) {
-        @if (module.value) {
-          <section class="cv-box">
-            <h2>CV</h2>
-            <pre>{{ module.value }}</pre>
-
-            @if (module.fileData) {
-              <a class="cv-link" [href]="module.fileData" [attr.download]="module.fileName || 'cv.pdf'">
-                Scarica CV
-              </a>
-            }
-          </section>
-        }
+        <div class="public-empty">
+          <h1>{{ currentPortfolio.title }}</h1>
+          <p>Questo portfolio non contiene ancora moduli pubblici da mostrare.</p>
+        </div>
       }
     </section>
   }
 </div>
+
+<ng-template #publicModule let-module let-depth="depth">
+  <section
+    class="public-node"
+    [class.public-node-title]="module.type === 'title'"
+    [class.public-node-description]="module.type === 'description'"
+    [class.public-node-image]="module.type === 'image'"
+    [class.public-node-table]="module.type === 'table'"
+    [class.public-node-cv]="module.type === 'cv'"
+    [style.grid-column]="getModuleStyle(module).gridColumn"
+    [style.grid-row]="getModuleStyle(module).gridRow"
+  >
+    @if (module.type === 'title') {
+      @switch (getHeadingTag(depth)) {
+        @case ('h1') {
+          <h1>{{ module.value || 'Titolo portfolio' }}</h1>
+        }
+        @case ('h2') {
+          <h2>{{ module.value || 'Titolo portfolio' }}</h2>
+        }
+        @default {
+          <h3>{{ module.value || 'Titolo portfolio' }}</h3>
+        }
+      }
+    }
+
+    @if (module.type === 'description' && module.value) {
+      <p class="description-text">{{ module.value }}</p>
+    }
+
+    @if (module.type === 'image') {
+      @if (module.values?.length) {
+        <div class="gallery-grid">
+          @for (image of module.values; track image) {
+            <img [src]="image" alt="Portfolio image" />
+          }
+        </div>
+      } @else {
+        <div class="module-placeholder">Nessuna immagine caricata.</div>
+      }
+    }
+
+    @if (module.type === 'table') {
+      @if (getTableRows(module.value).length > 0) {
+        <div class="public-table-shell">
+          <table class="public-table">
+            <tbody>
+              @for (row of getTableRows(module.value); track $index) {
+                <tr>
+                  @for (cell of row; track $index) {
+                    <td>{{ cell }}</td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <div class="module-placeholder">Tabella vuota.</div>
+      }
+    }
+
+    @if (module.type === 'cv') {
+      <section class="cv-box">
+        <div class="cv-head">
+          <h2>CV</h2>
+
+          @if (module.fileData) {
+            <a class="cv-link" [href]="module.fileData" [attr.download]="module.fileName || 'cv.pdf'">
+              Scarica CV
+            </a>
+          }
+        </div>
+
+        @if (module.value) {
+          <pre>{{ module.value }}</pre>
+        } @else {
+          <div class="module-placeholder">Nessun testo CV disponibile.</div>
+        }
+      </section>
+    }
+
+    @if (getVisibleChildren(module).length > 0) {
+      <div class="public-children-grid">
+        @for (child of getVisibleChildren(module); track trackModule($index, child)) {
+          <ng-container
+            [ngTemplateOutlet]="publicModule"
+            [ngTemplateOutletContext]="{ $implicit: child, depth: depth + 1 }"
+          />
+        }
+      </div>
+    }
+  </section>
+</ng-template>

@@ -1,54 +1,140 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: var(--public-page-bg, #081111);
+}
+
+:host,
+.public-shell {
+  background-color: var(--public-page-bg, #081111);
+}
+
 .public-shell {
   min-height: 100vh;
   padding: 2rem;
   color: #eff6f2;
+  background: var(--public-page-bg, #081111);
 }
 
-.portfolio-card,
+.public-canvas-shell,
 .empty-state {
-  max-width: 1080px;
+  max-width: 1180px;
   margin: 0 auto;
+}
+
+.empty-state,
+.public-empty {
   display: grid;
-  gap: 1.25rem;
+  gap: 1rem;
   padding: 2rem;
   border-radius: 1.85rem;
-  background: rgba(9, 17, 18, 0.52);
+  background: rgba(9, 17, 18, 0.36);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.portfolio-card h1,
+.public-grid,
+.public-children-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: 56px;
+  gap: 1rem;
+}
+
+.public-node {
+  min-width: 0;
+  min-height: 100%;
+  height: 100%;
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+}
+
+.public-node h1,
+.public-empty h1,
 .empty-state h1 {
   margin: 0;
-  font-size: clamp(2.5rem, 5vw, 5rem);
+  font-size: clamp(2.8rem, 5vw, 5.8rem);
+  line-height: 0.92;
+  max-width: 10ch;
+}
+
+.public-node h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 3vw, 3.2rem);
   line-height: 1;
 }
 
-.description-text {
+.public-node h3 {
   margin: 0;
-  color: #d9e7e2;
-  font-size: 1.08rem;
-  line-height: 1.8;
-  max-width: 48rem;
+  font-size: clamp(1.4rem, 2vw, 2.2rem);
+  line-height: 1.05;
 }
 
-.empty-state p {
+.public-node-title {
+  align-self: stretch;
+}
+
+.description-text,
+.empty-state p,
+.public-empty p,
+.cv-box pre {
   margin: 0;
-  color: #d0ddd8;
+  color: #d9e7e2;
+  line-height: 1.8;
+}
+
+.description-text {
+  font-size: 1.08rem;
+  max-width: none;
 }
 
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1rem;
+  height: 100%;
 }
 
 .gallery-grid img {
   width: 100%;
+  height: 100%;
   min-height: 260px;
   object-fit: cover;
-  border-radius: 1.4rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.3rem;
+}
+
+.public-table-shell {
+  overflow: auto;
+  min-height: 100%;
+}
+
+.public-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 26rem;
+}
+
+.public-table td {
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #d9e7e2;
+  vertical-align: top;
+}
+
+.cv-box {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  min-height: 100%;
+}
+
+.cv-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .cv-link {
@@ -61,25 +147,30 @@
   text-decoration: none;
 }
 
-.cv-box {
-  display: grid;
-  gap: 1rem;
-  padding: 1.25rem;
-  border-radius: 1.3rem;
-  background: rgba(9, 17, 18, 0.32);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.cv-box h2 {
-  margin: 0;
-}
-
 .cv-box pre {
-  margin: 0;
   white-space: pre-wrap;
   font-family: inherit;
-  line-height: 1.7;
-  color: #d7e4df;
+}
+
+.module-placeholder {
+  color: rgba(239, 246, 242, 0.62);
+}
+
+.public-children-grid {
+  min-height: 100%;
+  align-content: start;
+  padding-top: 0.25rem;
+}
+
+@media (max-width: 860px) {
+  .public-grid,
+  .public-children-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .public-node {
+    grid-column: 1 / -1 !important;
+  }
 }
 
 @media (max-width: 780px) {

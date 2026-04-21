@@ -111,7 +111,10 @@
               </label>
 
               @if (isExtractingCv()) {
-                <div class="helper-box">Sto estraendo il testo dal CV...</div>
+                <div class="helper-box">
+                  Sto importando il CV, ricostruisco il testo con la formattazione e aggiungo anche le
+                  immagini e le tabelle tra i contenuti selezionabili.
+                </div>
               }
 
               @if (extractionError()) {
@@ -124,7 +127,7 @@
                   pTextarea
                   formControlName="textValue"
                   rows="10"
-                  placeholder="Il testo del CV apparira' qui e potra' essere modificato."
+                  placeholder="Il testo del CV apparira' qui con la formattazione ricostruita e potra' essere modificato."
                 ></textarea>
               </label>
             }
@@ -142,6 +145,18 @@
                   }
                 </div>
               }
+            }
+
+            @if (isType(content, 'table')) {
+              <label class="field-block">
+                <span>Tabella</span>
+                <textarea
+                  pTextarea
+                  formControlName="textValue"
+                  rows="8"
+                  placeholder="Una riga per record, celle separate da tab"
+                ></textarea>
+              </label>
             }
           </section>
         }

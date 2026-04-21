@@ -14,8 +14,11 @@ import { CardModule } from 'primeng/card';
 import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { AuthApiService, PortfolioModuleDto } from '../services/auth-api.service';
+import { PdfImportService } from '../services/pdf-import.service';
 
-type ContentType = 'title' | 'description' | 'cv' | 'image' | 'background';
+type ContentType = 'title' | 'description' | 'cv' | 'image' | 'table' | 'background';
+
+const DEFAULT_BACKGROUND_COLOR = '#081111';
 
 interface ContentOption {
   value: ContentType;
@@ -24,6 +27,8 @@ interface ContentOption {
 }
 
 type ContentFormGroup = FormGroup<{
+  id: FormControl<string>;
+  importSourceId: FormControl<string>;
   type: FormControl<ContentType>;
   label: FormControl<string>;
   textValue: FormControl<string>;
@@ -32,20 +37,6 @@ type ContentFormGroup = FormGroup<{
   fileData: FormControl<string>;
   images: FormControl<string[]>;
 }>;
-
-interface PdfTextRun {
-  text: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-interface PdfTextLine {
-  y: number;
-  height: number;
-  runs: PdfTextRun[];
-}
 
 @Component({
   selector: 'app-new-portfolio-page',
@@ -58,6 +49,7 @@ export class NewPortfolioPage {
   private readonly router = inject(Router);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly authApiService = inject(AuthApiService);
+  private readonly pdfImportService = inject(PdfImportService);
 
   protected readonly isSubmitting = signal(false);
   protected readonly isExtractingCv = signal(false);
@@ -86,9 +78,9 @@ export class NewPortfolioPage {
       description: 'Aggiunge un array di immagini caricabili.'
     },
     {
-      value: 'background',
-      label: 'Background',
-      description: 'Definisce il colore di sfondo del portfolio.'
+      value: 'table',
+      label: 'Tabella',
+      description: 'Aggiunge una tabella modificabile.'
     }
   ];
 
@@ -134,7 +126,9 @@ export class NewPortfolioPage {
       return;
     }
 
-    const images = await Promise.all(files.map((file) => this.readFileAsDataUrl(file)));
+    const images = await Promise.all(
+      files.map((file) => this.pdfImportService.readFileAsDataUrl(file))
+    );
     control.patchValue({
       images: images.filter((image): image is string => Boolean(image))
     });
@@ -152,18 +146,21 @@ export class NewPortfolioPage {
     this.isExtractingCv.set(true);
 
     try {
-      const [fileData, extractedText] = await Promise.all([
-        this.readFileAsDataUrl(file),
-        this.extractPdfText(file)
+      const [fileData, importedCv] = await Promise.all([
+        this.pdfImportService.readFileAsDataUrl(file),
+        this.pdfImportService.importCv(file)
       ]);
 
       control.patchValue({
-        textValue: extractedText,
+        textValue: importedCv.text,
         fileData: fileData ?? '',
         fileName: file.name
       });
+      this.syncImportedCvAssets(index, control.controls.id.value, importedCv.images, importedCv.tables);
     } catch {
-      this.extractionError.set('Non sono riuscito a estrarre il testo dal CV. Puoi riprovare.');
+      this.extractionError.set(
+        'Non sono riuscito a importare correttamente il CV. Puoi riprovare con un altro PDF.'
+      );
     } finally {
       this.isExtractingCv.set(false);
     }
@@ -200,6 +197,8 @@ export class NewPortfolioPage {
 
   private createContentGroup(type: ContentType): ContentFormGroup {
     return new FormGroup({
+      id: new FormControl(this.generateContentId(), { nonNullable: true }),
+      importSourceId: new FormControl('', { nonNullable: true }),
       type: new FormControl(type, { nonNullable: true }),
       label: new FormControl(this.getContentTypeLabel(type), { nonNullable: true }),
       textValue: new FormControl('', { nonNullable: true }),
@@ -245,6 +244,61 @@ export class NewPortfolioPage {
         label: rawValue.label,
         value: rawValue.textValue
       };
+    }).concat({
+      type: 'background',
+      label: 'Background',
+      value: DEFAULT_BACKGROUND_COLOR
+    });
+  }
+
+  private syncImportedCvAssets(
+    sourceIndex: number,
+    sourceId: string,
+    images: string[],
+    tables: string[]
+  ) {
+    const importPrefix = `${sourceId}:`;
+    const importedAssets = [
+      ...images.map((image, index) => ({
+        importSourceId: `${sourceId}:image:${index}`,
+        type: 'image' as const,
+        label: `Immagine CV ${index + 1}`,
+        images: [image],
+        textValue: ''
+      })),
+      ...tables.map((table, index) => ({
+        importSourceId: `${sourceId}:table:${index}`,
+        type: 'table' as const,
+        label: `Tabella CV ${index + 1}`,
+        images: [] as string[],
+        textValue: table
+      }))
+    ];
+
+    const existingImportedControls = this.contentsArray.controls.filter((control) => {
+      const importSourceId = control.controls.importSourceId.value;
+      return importSourceId === sourceId || importSourceId.startsWith(importPrefix);
+    });
+    const existingImportedControlMap = new Map(
+      existingImportedControls.map((control) => [control.controls.importSourceId.value, control])
+    );
+
+    for (let index = this.contentsArray.length - 1; index >= 0; index--) {
+      const importSourceId = this.contentsArray.at(index)?.controls.importSourceId.value ?? '';
+      if (importSourceId === sourceId || importSourceId.startsWith(importPrefix)) {
+        this.contentsArray.removeAt(index);
+      }
+    }
+
+    importedAssets.forEach((asset, assetIndex) => {
+      const control = existingImportedControlMap.get(asset.importSourceId) ?? this.createContentGroup(asset.type);
+      control.patchValue({
+        importSourceId: asset.importSourceId,
+        label: asset.label,
+        textValue: asset.textValue,
+        images: asset.images
+      });
+      this.contentsArray.insert(sourceIndex + assetIndex + 1, control);
     });
   }
 
@@ -257,190 +311,11 @@ export class NewPortfolioPage {
       .replace(/^-+|-+$/g, '');
   }
 
-  private readFileAsDataUrl(file: File) {
-    return new Promise<string | null>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(file);
-    });
-  }
-
-  private async extractPdfText(file: File) {
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/legacy/build/pdf.worker.mjs',
-      import.meta.url
-    ).toString();
-
-    const data = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data }).promise;
-
-    const pagesText: string[] = [];
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-      const page = await pdf.getPage(pageNumber);
-      const textContent = await page.getTextContent();
-      const pageText = this.rebuildPdfPageText(textContent.items);
-
-      if (pageText) {
-        pagesText.push(pageText);
-      }
+  private generateContentId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
     }
 
-    return pagesText.join('\n\n');
-  }
-
-  private rebuildPdfPageText(items: unknown[]) {
-    const runs = items
-      .map((item) => this.toPdfTextRun(item))
-      .filter((run): run is PdfTextRun => Boolean(run))
-      .sort((left, right) => {
-        const yDelta = right.y - left.y;
-        if (Math.abs(yDelta) > 0.5) {
-          return yDelta;
-        }
-
-        return left.x - right.x;
-      });
-
-    if (runs.length === 0) {
-      return '';
-    }
-
-    const lines = this.groupRunsIntoLines(runs);
-    const pageMinX = Math.min(...runs.map((run) => run.x));
-
-    return lines
-      .map((line, index) => {
-        const lineText = this.buildLineText(line, pageMinX);
-        if (!lineText) {
-          return '';
-        }
-
-        if (index === 0) {
-          return lineText;
-        }
-
-        const previousLine = lines[index - 1];
-        const verticalGap = previousLine.y - line.y;
-        const expectedLineGap = Math.max(previousLine.height, line.height) * 1.35;
-
-        return verticalGap > expectedLineGap * 1.2 ? `\n${lineText}` : lineText;
-      })
-      .filter(Boolean)
-      .join('\n')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-  }
-
-  private toPdfTextRun(item: unknown): PdfTextRun | null {
-    if (!item || typeof item !== 'object' || !('str' in item) || !('transform' in item)) {
-      return null;
-    }
-
-    const pdfItem = item as {
-      str?: unknown;
-      transform?: unknown;
-      width?: unknown;
-      height?: unknown;
-    };
-
-    const text = typeof pdfItem.str === 'string' ? pdfItem.str : '';
-    const transform = Array.isArray(pdfItem.transform) ? pdfItem.transform : [];
-    if (!text.trim() || transform.length < 6) {
-      return null;
-    }
-
-    const x = typeof transform[4] === 'number' ? transform[4] : 0;
-    const y = typeof transform[5] === 'number' ? transform[5] : 0;
-    const width = typeof pdfItem.width === 'number' ? pdfItem.width : text.length * 6;
-    const height = Math.abs(
-      typeof pdfItem.height === 'number' ? pdfItem.height : transform[0] || 12
-    );
-
-    return {
-      text,
-      x,
-      y,
-      width,
-      height: height || 12
-    };
-  }
-
-  private groupRunsIntoLines(runs: PdfTextRun[]) {
-    const lines: PdfTextLine[] = [];
-
-    for (const run of runs) {
-      const matchingLine = lines.find((line) => {
-        const tolerance = Math.max(2.5, Math.min(line.height, run.height) * 0.45);
-        return Math.abs(line.y - run.y) <= tolerance;
-      });
-
-      if (!matchingLine) {
-        lines.push({
-          y: run.y,
-          height: run.height,
-          runs: [run]
-        });
-        continue;
-      }
-
-      matchingLine.runs.push(run);
-      matchingLine.y = (matchingLine.y + run.y) / 2;
-      matchingLine.height = Math.max(matchingLine.height, run.height);
-    }
-
-    return lines
-      .map((line) => ({
-        ...line,
-        runs: [...line.runs].sort((left, right) => left.x - right.x)
-      }))
-      .sort((left, right) => right.y - left.y);
-  }
-
-  private buildLineText(line: PdfTextLine, pageMinX: number) {
-    if (line.runs.length === 0) {
-      return '';
-    }
-
-    const firstRun = line.runs[0];
-    const averageCharWidth = this.getAverageCharWidth(line.runs);
-    const indentGap = Math.max(0, firstRun.x - pageMinX);
-    const indentSpaces =
-      indentGap > averageCharWidth * 2
-        ? ' '.repeat(Math.min(12, Math.round(indentGap / Math.max(averageCharWidth, 4))))
-        : '';
-
-    let text = indentSpaces + firstRun.text.trimEnd();
-    let previousRun = firstRun;
-
-    for (const run of line.runs.slice(1)) {
-      const previousEnd = previousRun.x + previousRun.width;
-      const horizontalGap = Math.max(0, run.x - previousEnd);
-      const currentAverageCharWidth = this.getAverageCharWidth([previousRun, run]);
-
-      if (horizontalGap > currentAverageCharWidth * 0.3 && !text.endsWith(' ')) {
-        const spaces = Math.max(
-          1,
-          Math.min(8, Math.round(horizontalGap / Math.max(currentAverageCharWidth, 4)))
-        );
-        text += ' '.repeat(spaces);
-      }
-
-      text += run.text.trimEnd();
-      previousRun = run;
-    }
-
-    return text.replace(/[ \t]+$/g, '');
-  }
-
-  private getAverageCharWidth(runs: PdfTextRun[]) {
-    const totalCharacters = runs.reduce(
-      (count, run) => count + Math.max(run.text.trim().length, 1),
-      0
-    );
-    const totalWidth = runs.reduce((width, run) => width + Math.max(run.width, run.height * 0.5), 0);
-
-    return totalWidth / Math.max(totalCharacters, 1);
+    return `content-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
 }

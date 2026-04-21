@@ -1,145 +1,131 @@
-import { isPlatformBrowser } from '@angular/common';
-import { Component, OnInit, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { NgTemplateOutlet, isPlatformBrowser } from '@angular/common';
 import {
-  FormArray,
-  FormBuilder,
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators
-} from '@angular/forms';
+  Component,
+  DestroyRef,
+  HostListener,
+  OnInit,
+  PLATFORM_ID,
+  computed,
+  effect,
+  inject,
+  signal
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TreeNode } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
-import { CardModule } from 'primeng/card';
 import { InputTextModule } from 'primeng/inputtext';
+import { Popover } from 'primeng/popover';
+import { PopoverModule } from 'primeng/popover';
 import { TextareaModule } from 'primeng/textarea';
-import { AuthApiService, PortfolioModuleDto, PortfolioPublicDto } from '../services/auth-api.service';
+import {
+  AuthApiService,
+  CreatePortfolioRequestDto,
+  PortfolioModuleDto
+} from '../services/auth-api.service';
+import { PdfImportService } from '../services/pdf-import.service';
+import {
+  ContentOption,
+  ContentType,
+  DEFAULT_BACKGROUND_COLOR,
+  EditorNodeData,
+  EditorNodeLayout,
+  PORTFOLIO_EDITOR_CONTENT_OPTIONS,
+  PortfolioEditorStateService
+} from '../services/portfolio-editor-state.service';
 
-type ContentType = 'title' | 'description' | 'cv' | 'image' | 'background';
-
-interface ContentOption {
-  value: ContentType;
-  label: string;
-  description: string;
+interface PreviewInteractionState {
+  mode: 'move' | 'resize-x' | 'resize-y' | 'resize-both';
+  nodeKey: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  initialLayout: EditorNodeLayout;
+  columnWidth: number;
+  rowHeight: number;
 }
 
-type ContentFormGroup = FormGroup<{
-  type: FormControl<ContentType>;
-  label: FormControl<string>;
-  textValue: FormControl<string>;
-  colorValue: FormControl<string>;
-  fileName: FormControl<string>;
-  fileData: FormControl<string>;
-  images: FormControl<string[]>;
-}>;
-
-interface PdfTextRun {
-  text: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-interface PdfTextLine {
-  y: number;
-  height: number;
-  runs: PdfTextRun[];
-}
+const GRID_COLUMNS = 12;
+const GRID_ROW_HEIGHT = 56;
+const MAX_GRID_ROW_SPAN = 240;
 
 @Component({
   selector: 'app-portfolio-editor-page',
-  imports: [ButtonModule, CardModule, RouterLink, ReactiveFormsModule, InputTextModule, TextareaModule],
+  imports: [
+    RouterLink,
+    ReactiveFormsModule,
+    ButtonModule,
+    InputTextModule,
+    TextareaModule,
+    PopoverModule,
+    NgTemplateOutlet
+  ],
   templateUrl: './portfolio-editor-page.html',
   styleUrl: './portfolio-editor-page.scss'
 })
 export class PortfolioEditorPage implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly authApiService = inject(AuthApiService);
+  private readonly pdfImportService = inject(PdfImportService);
+  private readonly portfolioEditorStateService = inject(PortfolioEditorStateService);
+
+  private previewInteraction: PreviewInteractionState | null = null;
 
   protected readonly isSubmitting = signal(false);
   protected readonly isExtractingCv = signal(false);
   protected readonly isLoadingPortfolio = signal(false);
   protected readonly extractionError = signal<string | null>(null);
   protected readonly loadError = signal<string | null>(null);
-  protected readonly selectedContentType = signal<ContentType>('title');
   protected readonly editingSlug = signal<string | null>(null);
-
-  protected readonly contentOptions: ContentOption[] = [
-    {
-      value: 'title',
-      label: 'Titolo',
-      description: 'Headline principale del portfolio.'
-    },
-    {
-      value: 'description',
-      label: 'Descrizione',
-      description: 'Testi introduttivi o blocchi editoriali.'
-    },
-    {
-      value: 'cv',
-      label: 'CV',
-      description: 'Curriculum con testo modificabile e file scaricabile.'
-    },
-    {
-      value: 'image',
-      label: 'Immagini',
-      description: 'Gallerie visive per presentare lavori e progetti.'
-    },
-    {
-      value: 'background',
-      label: 'Background',
-      description: 'Colore di atmosfera per la pagina pubblica.'
-    }
-  ];
+  protected readonly treeNodes = this.portfolioEditorStateService.treeNodes;
+  protected readonly previewNodes = computed(() => this.collectRenderableNodes(this.treeNodes()));
+  protected readonly hasPreviewContent = computed(() => this.previewNodes().length > 0);
+  protected readonly contentOptions: ContentOption[] = PORTFOLIO_EDITOR_CONTENT_OPTIONS;
+  protected readonly addableContentOptions = this.contentOptions.filter(
+    (option) => option.value !== 'background'
+  );
 
   protected readonly portfolioForm = this.formBuilder.nonNullable.group({
-    title: ['', [Validators.required]],
-    contents: this.formBuilder.array<ContentFormGroup>([])
+    title: ['', [Validators.required]]
+  });
+
+  protected readonly nodeEditorForm = this.formBuilder.nonNullable.group({
+    textValue: [''],
+    colorValue: [DEFAULT_BACKGROUND_COLOR]
   });
 
   protected readonly slugPreview = computed(() => this.slugify(this.portfolioForm.controls.title.value));
-  protected readonly moduleCount = computed(() => this.contentsArray.length);
-  protected readonly titleModulesCount = computed(
-    () => this.contentsArray.controls.filter((control) => control.controls.type.value === 'title').length
-  );
-  protected readonly descriptionModulesCount = computed(
-    () =>
-      this.contentsArray.controls.filter((control) => control.controls.type.value === 'description')
-        .length
-  );
-  protected readonly imageBlocksCount = computed(
-    () => this.contentsArray.controls.filter((control) => control.controls.type.value === 'image').length
-  );
-  protected readonly cvBlocksCount = computed(
-    () => this.contentsArray.controls.filter((control) => control.controls.type.value === 'cv').length
-  );
-  protected readonly previewBackground = computed(() => {
-    const backgroundControl = [...this.contentsArray.controls]
-      .reverse()
-      .find((control) => control.controls.type.value === 'background');
-    return backgroundControl?.controls.colorValue.value || '#081111';
+  protected readonly backgroundColor = computed(() => {
+    const rootBackgroundNode = this.treeNodes().find((node) => node.data?.type === 'background');
+    return rootBackgroundNode?.data?.colorValue || DEFAULT_BACKGROUND_COLOR;
   });
-  protected readonly previewTitles = computed(() =>
-    this.contentsArray.controls
-      .filter((control) => control.controls.type.value === 'title')
-      .map((control) => control.controls.textValue.value.trim())
-      .filter(Boolean)
-  );
-  protected readonly previewDescriptions = computed(() =>
-    this.contentsArray.controls
-      .filter((control) => control.controls.type.value === 'description')
-      .map((control) => control.controls.textValue.value.trim())
-      .filter(Boolean)
-  );
+
+  constructor() {
+    effect(() => {
+      this.patchInspectorForm(this.portfolioEditorStateService.selectedTreeNode());
+    });
+  }
 
   ngOnInit() {
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
+
+    this.portfolioEditorStateService.reset();
+
+    this.nodeEditorForm.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((value) =>
+        this.applyInspectorChanges({
+          textValue: value.textValue ?? '',
+          colorValue: value.colorValue ?? DEFAULT_BACKGROUND_COLOR
+        })
+      );
 
     const slug = this.route.snapshot.paramMap.get('slug');
     if (!slug) {
@@ -151,132 +137,260 @@ export class PortfolioEditorPage implements OnInit {
     this.loadPortfolio(slug);
   }
 
-  protected get contentsArray(): FormArray<ContentFormGroup> {
-    return this.portfolioForm.controls.contents;
+  @HostListener('window:pointermove', ['$event'])
+  protected onWindowPointerMove(event: PointerEvent) {
+    if (!this.previewInteraction || event.pointerId !== this.previewInteraction.pointerId) {
+      return;
+    }
+
+    const node = this.findNodeByKey(this.treeNodes(), this.previewInteraction.nodeKey);
+    if (!node?.data) {
+      this.previewInteraction = null;
+      return;
+    }
+
+    event.preventDefault();
+
+    const deltaColumns = Math.round(
+      (event.clientX - this.previewInteraction.startX) /
+        Math.max(this.previewInteraction.columnWidth, 1)
+    );
+    const deltaRows = Math.round(
+      (event.clientY - this.previewInteraction.startY) /
+        this.previewInteraction.rowHeight
+    );
+
+    const nextLayout = { ...this.previewInteraction.initialLayout };
+
+    switch (this.previewInteraction.mode) {
+      case 'move':
+        nextLayout.columnStart = this.previewInteraction.initialLayout.columnStart + deltaColumns;
+        nextLayout.rowStart = this.previewInteraction.initialLayout.rowStart + deltaRows;
+        break;
+      case 'resize-x':
+        nextLayout.columnSpan = this.previewInteraction.initialLayout.columnSpan + deltaColumns;
+        break;
+      case 'resize-y':
+        nextLayout.rowSpan = this.previewInteraction.initialLayout.rowSpan + deltaRows;
+        break;
+      case 'resize-both':
+        nextLayout.columnSpan = this.previewInteraction.initialLayout.columnSpan + deltaColumns;
+        nextLayout.rowSpan = this.previewInteraction.initialLayout.rowSpan + deltaRows;
+        break;
+    }
+
+    node.data.layout = this.normalizeLayout(node.data.type, nextLayout);
+    this.refreshSelectedNode(node.key ?? null);
   }
 
-  protected setSelectedContentType(value: string) {
-    this.selectedContentType.set(value as ContentType);
+  @HostListener('window:pointerup', ['$event'])
+  @HostListener('window:pointercancel', ['$event'])
+  protected onWindowPointerUp(event: PointerEvent) {
+    if (!this.previewInteraction || event.pointerId !== this.previewInteraction.pointerId) {
+      return;
+    }
+
+    this.previewInteraction = null;
   }
 
-  protected addSelectedContent() {
-    this.contentsArray.push(this.createContentGroup(this.selectedContentType()));
+  protected get selectedTreeNode() {
+    return this.portfolioEditorStateService.selectedTreeNode();
   }
 
-  protected removeContent(index: number) {
-    this.contentsArray.removeAt(index);
+  protected get selectedNodeData() {
+    return this.selectedTreeNode?.data ?? null;
   }
 
-  protected trackContent(_index: number, control: ContentFormGroup) {
-    return control;
+  protected get selectedNodeType() {
+    return this.selectedTreeNode?.data?.type ?? null;
+  }
+
+  protected get selectedNodeChildren() {
+    return this.selectedTreeNode?.children ?? [];
+  }
+
+  protected addNode(type: ContentType, popover?: Popover) {
+    this.portfolioEditorStateService.addNode(type);
+    popover?.hide();
+  }
+
+  protected removeSelectedNode() {
+    this.portfolioEditorStateService.removeSelectedNode();
+  }
+
+  protected isSelectedPreviewNode(node: TreeNode<EditorNodeData>) {
+    return node.key === this.selectedTreeNode?.key;
+  }
+
+  protected previewNodeStyle(node: TreeNode<EditorNodeData>) {
+    const layout = node.data?.layout ?? this.portfolioEditorStateService.getDefaultLayout('description');
+    return {
+      gridColumn: `${layout.columnStart} / span ${layout.columnSpan}`,
+      gridRow: `${layout.rowStart} / span ${layout.rowSpan}`
+    };
+  }
+
+  protected selectPreviewNode(node: TreeNode<EditorNodeData>, event?: Event) {
+    event?.stopPropagation();
+    this.portfolioEditorStateService.selectNodeByKey(node.key ?? null);
+  }
+
+  protected startNodeMove(event: PointerEvent, node: TreeNode<EditorNodeData>) {
+    this.startPreviewInteraction(event, node, 'move');
+  }
+
+  protected startNodeResize(
+    event: PointerEvent,
+    node: TreeNode<EditorNodeData>,
+    mode: 'resize-x' | 'resize-y' | 'resize-both'
+  ) {
+    this.startPreviewInteraction(event, node, mode);
+  }
+
+  protected visibleNodeChildren(node: TreeNode<EditorNodeData>) {
+    return this.collectRenderableNodes(node.children ?? []);
+  }
+
+  protected trackNode(_index: number, node: TreeNode<EditorNodeData>) {
+    return node.key ?? node.label;
   }
 
   protected getContentTypeLabel(type: ContentType) {
-    return this.contentOptions.find((option) => option.value === type)?.label ?? type;
+    return this.portfolioEditorStateService.getContentTypeLabel(type);
   }
 
-  protected isType(control: ContentFormGroup, type: ContentType) {
-    return control.controls.type.value === type;
+  protected canRemoveSelectedNode() {
+    return this.portfolioEditorStateService.canRemoveSelectedNode();
   }
 
-  protected openPublicPreview() {
-    const slug = this.editingSlug() ?? this.slugPreview();
-    if (!slug) {
-      return;
-    }
-
-    void this.router.navigateByUrl(`/${slug}`);
+  protected getPreviewHeadingTag(depth: number) {
+    return depth === 0 ? 'h1' : depth === 1 ? 'h2' : 'h3';
   }
 
-  protected async onImagesSelected(index: number, event: Event) {
+  protected getTableRows(textValue: string) {
+    return this.parseTableRows(textValue);
+  }
+
+  protected async onImagesSelected(event: Event) {
+    const selectedNode = this.selectedTreeNode;
     const files = Array.from((event.target as HTMLInputElement).files ?? []);
-    const control = this.contentsArray.at(index);
-    if (!isPlatformBrowser(this.platformId) || files.length === 0 || !control) {
+    if (!selectedNode?.data || selectedNode.data.type !== 'image' || files.length === 0) {
       return;
     }
 
-    const images = await Promise.all(files.map((file) => this.readFileAsDataUrl(file)));
-    control.patchValue({
-      images: [
-        ...control.controls.images.value,
-        ...images.filter((image): image is string => Boolean(image))
-      ]
-    });
+    const images = await Promise.all(
+      files.map((file) => this.pdfImportService.readFileAsDataUrl(file))
+    );
+    selectedNode.data.images = [
+      ...selectedNode.data.images,
+      ...images.filter((image): image is string => Boolean(image))
+    ];
+
+    this.refreshSelectedNode(selectedNode.key ?? null);
   }
 
-  protected removeImage(index: number, imageIndex: number) {
-    const control = this.contentsArray.at(index);
-    if (!control) {
+  protected removeImage(imageIndex: number) {
+    const selectedNode = this.selectedTreeNode;
+    if (!selectedNode?.data || selectedNode.data.type !== 'image') {
       return;
     }
 
-    control.patchValue({
-      images: control.controls.images.value.filter((_, currentImageIndex) => currentImageIndex !== imageIndex)
-    });
+    selectedNode.data.images = selectedNode.data.images.filter(
+      (_image, currentImageIndex) => currentImageIndex !== imageIndex
+    );
+    this.refreshSelectedNode(selectedNode.key ?? null);
   }
 
-  protected async onCvSelected(index: number, event: Event) {
+  protected async onCvSelected(event: Event) {
+    const selectedNode = this.selectedTreeNode;
     const file = (event.target as HTMLInputElement).files?.[0];
-    const control = this.contentsArray.at(index);
     this.extractionError.set(null);
 
-    if (!isPlatformBrowser(this.platformId) || !file || !control) {
+    if (!selectedNode?.data || selectedNode.data.type !== 'cv' || !file) {
       return;
     }
 
     this.isExtractingCv.set(true);
 
     try {
-      const [fileData, extractedText] = await Promise.all([
-        this.readFileAsDataUrl(file),
-        this.extractPdfText(file)
+      const [fileData, importedCv] = await Promise.all([
+        this.pdfImportService.readFileAsDataUrl(file),
+        this.pdfImportService.importCv(file)
       ]);
 
-      control.patchValue({
-        textValue: extractedText,
-        fileData: fileData ?? '',
-        fileName: file.name
-      });
+      selectedNode.data.fileData = fileData ?? '';
+      selectedNode.data.fileName = file.name;
+      selectedNode.data.textValue = importedCv.text;
+      this.ensureNodeFitsContent(selectedNode);
+      this.syncImportedCvAssetNodes(selectedNode, importedCv.images, importedCv.tables);
+
+      this.refreshSelectedNode(selectedNode.key ?? null);
     } catch {
-      this.extractionError.set('Non sono riuscito a estrarre il testo dal CV. Puoi riprovare.');
+      this.extractionError.set(
+        'Non sono riuscito a importare correttamente il CV. Puoi riprovare con un altro PDF.'
+      );
     } finally {
       this.isExtractingCv.set(false);
     }
   }
 
   protected submit() {
-    const slug = this.editingSlug();
-    if (!slug) {
+    this.persistPortfolio((portfolio) => {
+      void this.router.navigate(['/portfolios', portfolio.slug, 'edit']);
+    });
+  }
+
+  protected openLivePortfolio() {
+    const previewWindow = window.open('about:blank', '_blank');
+
+    if (previewWindow) {
+      previewWindow.document.write(
+        '<!doctype html><title>Preview portfolio</title><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#081111;color:#eff6f2;font-family:sans-serif">Sto aprendo la preview del portfolio...</body>'
+      );
+      previewWindow.document.close();
+    }
+
+    this.persistPortfolio((portfolio) => {
+      if (previewWindow) {
+        previewWindow.location.href = `/${portfolio.slug}`;
+      } else {
+        window.open(`/${portfolio.slug}`, '_blank');
+      }
+    }, () => {
+      previewWindow?.close();
+    });
+  }
+
+  private startPreviewInteraction(
+    event: PointerEvent,
+    node: TreeNode<EditorNodeData>,
+    mode: PreviewInteractionState['mode']
+  ) {
+    if (!node.data || node.data.type === 'background' || !node.key) {
       return;
     }
 
-    this.portfolioForm.markAllAsTouched();
-    if (this.portfolioForm.invalid) {
+    const trigger = event.currentTarget as HTMLElement | null;
+    const grid = trigger?.closest('.preview-grid') as HTMLElement | null;
+    if (!grid) {
       return;
     }
 
-    const title = this.portfolioForm.controls.title.value.trim();
-    if (!title) {
-      return;
-    }
+    event.preventDefault();
+    event.stopPropagation();
 
-    this.isSubmitting.set(true);
-
-    this.authApiService
-      .updatePortfolio(slug, {
-        title,
-        modules: this.buildModulesPayload()
-      })
-      .subscribe({
-        next: (portfolio) => {
-          this.isSubmitting.set(false);
-          this.editingSlug.set(portfolio.slug);
-          void this.router.navigate(['/portfolios', portfolio.slug, 'edit']);
-        },
-        error: () => {
-          this.isSubmitting.set(false);
-        }
-      });
+    const gridRect = grid.getBoundingClientRect();
+    this.portfolioEditorStateService.selectNodeByKey(node.key);
+    this.previewInteraction = {
+      mode,
+      nodeKey: node.key,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      initialLayout: { ...node.data.layout },
+      columnWidth: gridRect.width / GRID_COLUMNS,
+      rowHeight: GRID_ROW_HEIGHT
+    };
   }
 
   private loadPortfolio(slug: string) {
@@ -285,8 +399,12 @@ export class PortfolioEditorPage implements OnInit {
 
     this.authApiService.getMyPortfolio(slug).subscribe({
       next: (portfolio) => {
-        this.populateForm(portfolio);
+        this.portfolioForm.controls.title.setValue(portfolio.title);
+        this.portfolioEditorStateService.setTreeNodes(this.deserializeNodes(portfolio.modules));
         this.isLoadingPortfolio.set(false);
+
+        const firstNode = this.previewNodes()[0] ?? this.treeNodes()[0] ?? null;
+        this.portfolioEditorStateService.onSelectionChange(firstNode);
       },
       error: () => {
         this.loadError.set('Non sono riuscito a caricare questo portfolio. Riprova tra poco.');
@@ -295,107 +413,437 @@ export class PortfolioEditorPage implements OnInit {
     });
   }
 
-  private populateForm(portfolio: PortfolioPublicDto) {
-    this.portfolioForm.controls.title.setValue(portfolio.title);
-    this.contentsArray.clear();
+  private deserializeNodes(modules: PortfolioModuleDto[]): TreeNode<EditorNodeData>[] {
+    return modules
+      .filter((module): module is PortfolioModuleDto & { type: ContentType } =>
+        this.isSupportedContentType(module.type)
+      )
+      .map((module) => {
+        const key =
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `node-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        const type: ContentType = module.type;
+        const textValue = module.value ?? '';
+        const layout = this.expandLayoutForContent(
+          type,
+          textValue,
+          this.normalizeLayout(type, module.layout)
+        );
 
-    for (const module of portfolio.modules) {
-      const contentGroup = this.createContentGroupFromModule(module);
-      if (contentGroup) {
-        this.contentsArray.push(contentGroup);
-      }
-    }
-  }
-
-  private createContentGroup(type: ContentType): ContentFormGroup {
-    return new FormGroup({
-      type: new FormControl(type, { nonNullable: true }),
-      label: new FormControl(this.getContentTypeLabel(type), { nonNullable: true }),
-      textValue: new FormControl('', { nonNullable: true }),
-      colorValue: new FormControl('#0b1111', { nonNullable: true }),
-      fileName: new FormControl('', { nonNullable: true }),
-      fileData: new FormControl('', { nonNullable: true }),
-      images: new FormControl<string[]>([], { nonNullable: true })
-    });
-  }
-
-  private createContentGroupFromModule(module: PortfolioModuleDto) {
-    if (!this.isSupportedContentType(module.type)) {
-      return null;
-    }
-
-    const contentGroup = this.createContentGroup(module.type);
-
-    if (module.type === 'image') {
-      contentGroup.patchValue({
-        images: module.values ?? []
-      });
-      return contentGroup;
-    }
-
-    if (module.type === 'background') {
-      contentGroup.patchValue({
-        colorValue: module.value || '#0b1111'
-      });
-      return contentGroup;
-    }
-
-    if (module.type === 'cv') {
-      contentGroup.patchValue({
-        textValue: module.value ?? '',
-        fileName: module.fileName ?? '',
-        fileData: module.fileData ?? ''
-      });
-      return contentGroup;
-    }
-
-    contentGroup.patchValue({
-      textValue: module.value ?? ''
-    });
-
-    return contentGroup;
-  }
-
-  private isSupportedContentType(type: string): type is ContentType {
-    return this.contentOptions.some((option) => option.value === type);
-  }
-
-  private buildModulesPayload(): PortfolioModuleDto[] {
-    return this.contentsArray.controls.map((control) => {
-      const rawValue = control.getRawValue();
-
-      if (rawValue.type === 'image') {
         return {
-          type: rawValue.type,
-          label: rawValue.label,
-          values: rawValue.images
+          key,
+          label: this.getContentTypeLabel(type),
+          icon: this.portfolioEditorStateService.getTreeNodeIcon(type),
+          expanded: true,
+          selectable: true,
+          draggable: type !== 'background',
+          droppable: true,
+          data: {
+            type,
+            label: this.getContentTypeLabel(type),
+            textValue,
+            colorValue:
+              type === 'background' ? module.value || DEFAULT_BACKGROUND_COLOR : DEFAULT_BACKGROUND_COLOR,
+            fileName: module.fileName ?? '',
+            fileData: module.fileData ?? '',
+            images: module.values ?? [],
+            importSourceKey: undefined,
+            layout
+          },
+          children: this.deserializeNodes(module.children ?? [])
+        };
+      });
+  }
+
+  private serializeNodes(nodes: TreeNode<EditorNodeData>[]): PortfolioModuleDto[] {
+    return nodes.map((node) => {
+      const data = node.data!;
+      const basePayload = {
+        type: data.type,
+        label: data.label,
+        layout: { ...data.layout },
+        children: this.serializeNodes(node.children ?? [])
+      };
+
+      if (data.type === 'image') {
+        return {
+          ...basePayload,
+          values: data.images
         };
       }
 
-      if (rawValue.type === 'background') {
+      if (data.type === 'background') {
         return {
-          type: rawValue.type,
-          label: rawValue.label,
-          value: rawValue.colorValue
+          ...basePayload,
+          value: data.colorValue
         };
       }
 
-      if (rawValue.type === 'cv') {
+      if (data.type === 'cv') {
         return {
-          type: rawValue.type,
-          label: rawValue.label,
-          value: rawValue.textValue,
-          fileName: rawValue.fileName,
-          fileData: rawValue.fileData
+          ...basePayload,
+          value: data.textValue,
+          fileName: data.fileName,
+          fileData: data.fileData
         };
       }
 
       return {
-        type: rawValue.type,
-        label: rawValue.label,
-        value: rawValue.textValue
+        ...basePayload,
+        value: data.textValue
       };
     });
+  }
+
+  private applyInspectorChanges(value: { textValue: string; colorValue: string }) {
+    const selectedNode = this.selectedTreeNode;
+    if (!selectedNode?.data) {
+      return;
+    }
+
+    if (selectedNode.data.type === 'background') {
+      selectedNode.data.colorValue = value.colorValue;
+    } else {
+      selectedNode.data.textValue = value.textValue;
+      this.ensureNodeFitsContent(selectedNode);
+    }
+
+    this.refreshSelectedNode(selectedNode.key ?? null);
+  }
+
+  private persistPortfolio(
+    onSuccess?: (portfolio: { slug: string }) => void,
+    onError?: () => void
+  ) {
+    const slug = this.editingSlug();
+    const payload = this.buildPortfolioPayload();
+    if (!slug || !payload) {
+      onError?.();
+      return;
+    }
+
+    this.isSubmitting.set(true);
+
+    this.authApiService.updatePortfolio(slug, payload).subscribe({
+      next: (portfolio) => {
+        this.isSubmitting.set(false);
+        this.editingSlug.set(portfolio.slug);
+        onSuccess?.(portfolio);
+      },
+      error: () => {
+        this.isSubmitting.set(false);
+        onError?.();
+      }
+    });
+  }
+
+  private buildPortfolioPayload(): CreatePortfolioRequestDto | null {
+    this.portfolioForm.markAllAsTouched();
+    if (this.portfolioForm.invalid) {
+      return null;
+    }
+
+    const title = this.portfolioForm.controls.title.value.trim();
+    if (!title) {
+      return null;
+    }
+
+    return {
+      title,
+      modules: this.serializeNodes(this.treeNodes())
+    };
+  }
+
+  private patchInspectorForm(node: TreeNode<EditorNodeData> | null) {
+    this.nodeEditorForm.patchValue(
+      {
+        textValue: node?.data?.textValue ?? '',
+        colorValue: node?.data?.colorValue ?? DEFAULT_BACKGROUND_COLOR
+      },
+      { emitEvent: false }
+    );
+  }
+
+  private refreshSelectedNode(key: string | null) {
+    this.portfolioEditorStateService.refreshTree();
+    this.portfolioEditorStateService.selectNodeByKey(key);
+  }
+
+  private syncImportedCvAssetNodes(
+    sourceNode: TreeNode<EditorNodeData>,
+    images: string[],
+    tables: string[]
+  ) {
+    const sourceNodeKey = sourceNode.key ?? null;
+    const sourceLayout = sourceNode.data?.layout;
+    if (!sourceNodeKey || !sourceLayout) {
+      return;
+    }
+
+    const relation = this.findNodeRelation(this.treeNodes(), sourceNodeKey);
+    if (!relation) {
+      return;
+    }
+
+    const importPrefix = `${sourceNodeKey}:`;
+    const importedAssets = [
+      ...images.map((image, index) => ({
+        key: `${sourceNodeKey}:image:${index}`,
+        type: 'image' as const,
+        label: `Immagine CV ${index + 1}`,
+        images: [image],
+        textValue: ''
+      })),
+      ...tables.map((table, index) => ({
+        key: `${sourceNodeKey}:table:${index}`,
+        type: 'table' as const,
+        label: `Tabella CV ${index + 1}`,
+        images: [] as string[],
+        textValue: table
+      }))
+    ];
+
+    const existingImportedNodes = relation.nodes.filter((node) => {
+      const importKey = node.data?.importSourceKey;
+      return importKey === sourceNodeKey || importKey?.startsWith(importPrefix);
+    });
+    const existingImportedNodeMap = new Map(
+      existingImportedNodes
+        .filter((node): node is TreeNode<EditorNodeData> & { data: EditorNodeData } => Boolean(node.data))
+        .map((node) => [node.data.importSourceKey!, node])
+    );
+    const preservedNodes = relation.nodes.filter((node) => {
+      const importKey = node.data?.importSourceKey;
+      return !(importKey === sourceNodeKey || importKey?.startsWith(importPrefix));
+    });
+    const sourceIndex = preservedNodes.findIndex((node) => node.key === sourceNodeKey);
+    if (sourceIndex < 0) {
+      return;
+    }
+
+    const nextImportedNodes = importedAssets.map((asset, assetIndex) => {
+      const existingNode = existingImportedNodeMap.get(asset.key);
+      if (existingNode?.data) {
+        existingNode.label = asset.label;
+        existingNode.data.label = asset.label;
+        existingNode.data.images = [...asset.images];
+        existingNode.data.textValue = asset.textValue;
+        existingNode.data.importSourceKey = asset.key;
+        return existingNode;
+      }
+
+      const nextNode = this.portfolioEditorStateService.createTreeNode(asset.type);
+      nextNode.label = asset.label;
+      if (nextNode.data) {
+        nextNode.data.label = asset.label;
+        nextNode.data.images = [...asset.images];
+        nextNode.data.textValue = asset.textValue;
+        nextNode.data.importSourceKey = asset.key;
+        nextNode.data.layout = this.expandImportedAssetLayout(sourceLayout, asset.type, assetIndex);
+      }
+      return nextNode;
+    });
+
+    preservedNodes.splice(sourceIndex + 1, 0, ...nextImportedNodes);
+    relation.nodes.splice(0, relation.nodes.length, ...preservedNodes);
+  }
+
+  private ensureNodeFitsContent(node: TreeNode<EditorNodeData>) {
+    if (!node.data) {
+      return;
+    }
+
+    node.data.layout = this.expandLayoutForContent(
+      node.data.type,
+      node.data.textValue,
+      node.data.layout
+    );
+  }
+
+  private collectRenderableNodes(nodes: TreeNode<EditorNodeData>[]): TreeNode<EditorNodeData>[] {
+    return nodes.flatMap((node) =>
+      node.data?.type === 'background' ? this.collectRenderableNodes(node.children ?? []) : [node]
+    );
+  }
+
+  private findNodeByKey(nodes: TreeNode<EditorNodeData>[], key: string): TreeNode<EditorNodeData> | null {
+    for (const node of nodes) {
+      if (node.key === key) {
+        return node;
+      }
+
+      const childMatch = this.findNodeByKey(node.children ?? [], key);
+      if (childMatch) {
+        return childMatch;
+      }
+    }
+
+    return null;
+  }
+
+  private findNodeRelation(
+    nodes: TreeNode<EditorNodeData>[],
+    key: string
+  ): { nodes: TreeNode<EditorNodeData>[]; index: number } | null {
+    const directIndex = nodes.findIndex((node) => node.key === key);
+    if (directIndex >= 0) {
+      return { nodes, index: directIndex };
+    }
+
+    for (const node of nodes) {
+      const childRelation = this.findNodeRelation(node.children ?? [], key);
+      if (childRelation) {
+        return childRelation;
+      }
+    }
+
+    return null;
+  }
+
+  private normalizeLayout(type: ContentType, layout?: Partial<EditorNodeLayout> | null): EditorNodeLayout {
+    const fallback = this.portfolioEditorStateService.getDefaultLayout(type);
+    const minColumnSpan = type === 'title' ? 3 : type === 'background' ? GRID_COLUMNS : 2;
+    const minRowSpan = type === 'background' ? 1 : 2;
+    const columnSpan = this.clampInteger(layout?.columnSpan, minColumnSpan, GRID_COLUMNS, fallback.columnSpan);
+    const columnStart = this.clampInteger(
+      layout?.columnStart,
+      1,
+      GRID_COLUMNS - columnSpan + 1,
+      fallback.columnStart
+    );
+    const rowSpan = this.clampInteger(layout?.rowSpan, minRowSpan, MAX_GRID_ROW_SPAN, fallback.rowSpan);
+    const rowStart = this.clampInteger(layout?.rowStart, 1, 999, fallback.rowStart);
+
+    return {
+      columnStart,
+      rowStart,
+      columnSpan,
+      rowSpan
+    };
+  }
+
+  private expandImportedImageLayout(sourceLayout: EditorNodeLayout) {
+    const defaultImageLayout = this.portfolioEditorStateService.getDefaultLayout('image');
+    const sourceColumnEnd = sourceLayout.columnStart + sourceLayout.columnSpan - 1;
+    const remainingColumnsRight = GRID_COLUMNS - sourceColumnEnd;
+
+    if (remainingColumnsRight >= 3) {
+      return this.normalizeLayout('image', {
+        columnStart: sourceColumnEnd + 1,
+        rowStart: sourceLayout.rowStart,
+        columnSpan: Math.min(defaultImageLayout.columnSpan, remainingColumnsRight),
+        rowSpan: Math.max(defaultImageLayout.rowSpan, Math.min(sourceLayout.rowSpan, 12))
+      });
+    }
+
+    return this.normalizeLayout('image', {
+      columnStart: sourceLayout.columnStart,
+      rowStart: sourceLayout.rowStart + sourceLayout.rowSpan,
+      columnSpan: Math.min(defaultImageLayout.columnSpan, sourceLayout.columnSpan),
+      rowSpan: defaultImageLayout.rowSpan
+    });
+  }
+
+  private expandImportedTableLayout(sourceLayout: EditorNodeLayout) {
+    const defaultTableLayout = this.portfolioEditorStateService.getDefaultLayout('table');
+
+    return this.normalizeLayout('table', {
+      columnStart: sourceLayout.columnStart,
+      rowStart: sourceLayout.rowStart + sourceLayout.rowSpan + 1,
+      columnSpan: Math.max(defaultTableLayout.columnSpan, sourceLayout.columnSpan),
+      rowSpan: defaultTableLayout.rowSpan
+    });
+  }
+
+  private expandImportedAssetLayout(
+    sourceLayout: EditorNodeLayout,
+    type: 'image' | 'table',
+    assetIndex: number
+  ) {
+    const baseLayout =
+      type === 'image'
+        ? this.expandImportedImageLayout(sourceLayout)
+        : this.expandImportedTableLayout(sourceLayout);
+
+    return this.normalizeLayout(type, {
+      ...baseLayout,
+      rowStart: baseLayout.rowStart + assetIndex * (baseLayout.rowSpan + 1)
+    });
+  }
+
+  private clampInteger(value: number | undefined, min: number, max: number, fallback: number) {
+    const normalizedValue =
+      typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : fallback;
+
+    return Math.min(max, Math.max(min, normalizedValue));
+  }
+
+  private expandLayoutForContent(
+    type: ContentType,
+    textValue: string,
+    layout: EditorNodeLayout
+  ): EditorNodeLayout {
+    const requiredRowSpan = this.getRequiredRowSpan(type, textValue, layout.columnSpan);
+    if (requiredRowSpan <= layout.rowSpan) {
+      return layout;
+    }
+
+    return {
+      ...layout,
+      rowSpan: requiredRowSpan
+    };
+  }
+
+  private getRequiredRowSpan(type: ContentType, textValue: string, columnSpan: number) {
+    switch (type) {
+      case 'cv':
+        return Math.min(
+          MAX_GRID_ROW_SPAN,
+          Math.max(8, 4 + Math.ceil(this.estimateWrappedLineCount(textValue, columnSpan, 9) / 2))
+        );
+      case 'description':
+        return Math.min(
+          MAX_GRID_ROW_SPAN,
+          Math.max(3, 2 + Math.ceil(this.estimateWrappedLineCount(textValue, columnSpan, 12) / 3))
+        );
+      case 'table':
+        return Math.min(
+          MAX_GRID_ROW_SPAN,
+          Math.max(4, 2 + this.parseTableRows(textValue).length * 2)
+        );
+      case 'title':
+        return Math.min(
+          MAX_GRID_ROW_SPAN,
+          Math.max(2, 1 + Math.ceil(this.estimateWrappedLineCount(textValue, columnSpan, 8) / 2))
+        );
+      default:
+        return 0;
+    }
+  }
+
+  private estimateWrappedLineCount(textValue: string, columnSpan: number, charsPerColumn: number) {
+    const normalizedText = textValue.trim();
+    if (!normalizedText) {
+      return 0;
+    }
+
+    const charactersPerLine = Math.max(18, Math.round(columnSpan * charsPerColumn));
+    return normalizedText.split('\n').reduce((lineCount, line) => {
+      const normalizedLineLength = Math.max(line.trim().length, 1);
+      return lineCount + Math.max(1, Math.ceil(normalizedLineLength / charactersPerLine));
+    }, 0);
+  }
+
+  private parseTableRows(textValue: string) {
+    return textValue
+      .split('\n')
+      .map((row) => row.split('\t').map((cell) => cell.trim()))
+      .filter((row) => row.some((cell) => Boolean(cell)));
+  }
+
+  private isSupportedContentType(type: string): type is ContentType {
+    return this.contentOptions.some((option) => option.value === type);
   }
 
   private slugify(value: string) {
@@ -407,190 +855,4 @@ export class PortfolioEditorPage implements OnInit {
       .replace(/^-+|-+$/g, '');
   }
 
-  private readFileAsDataUrl(file: File) {
-    return new Promise<string | null>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(file);
-    });
-  }
-
-  private async extractPdfText(file: File) {
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/legacy/build/pdf.worker.mjs',
-      import.meta.url
-    ).toString();
-
-    const data = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data }).promise;
-
-    const pagesText: string[] = [];
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-      const page = await pdf.getPage(pageNumber);
-      const textContent = await page.getTextContent();
-      const pageText = this.rebuildPdfPageText(textContent.items);
-
-      if (pageText) {
-        pagesText.push(pageText);
-      }
-    }
-
-    return pagesText.join('\n\n');
-  }
-
-  private rebuildPdfPageText(items: unknown[]) {
-    const runs = items
-      .map((item) => this.toPdfTextRun(item))
-      .filter((run): run is PdfTextRun => Boolean(run))
-      .sort((left, right) => {
-        const yDelta = right.y - left.y;
-        if (Math.abs(yDelta) > 0.5) {
-          return yDelta;
-        }
-
-        return left.x - right.x;
-      });
-
-    if (runs.length === 0) {
-      return '';
-    }
-
-    const lines = this.groupRunsIntoLines(runs);
-    const pageMinX = Math.min(...runs.map((run) => run.x));
-
-    return lines
-      .map((line, index) => {
-        const lineText = this.buildLineText(line, pageMinX);
-        if (!lineText) {
-          return '';
-        }
-
-        if (index === 0) {
-          return lineText;
-        }
-
-        const previousLine = lines[index - 1];
-        const verticalGap = previousLine.y - line.y;
-        const expectedLineGap = Math.max(previousLine.height, line.height) * 1.35;
-
-        return verticalGap > expectedLineGap * 1.2 ? `\n${lineText}` : lineText;
-      })
-      .filter(Boolean)
-      .join('\n')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-  }
-
-  private toPdfTextRun(item: unknown): PdfTextRun | null {
-    if (!item || typeof item !== 'object' || !('str' in item) || !('transform' in item)) {
-      return null;
-    }
-
-    const pdfItem = item as {
-      str?: unknown;
-      transform?: unknown;
-      width?: unknown;
-      height?: unknown;
-    };
-
-    const text = typeof pdfItem.str === 'string' ? pdfItem.str : '';
-    const transform = Array.isArray(pdfItem.transform) ? pdfItem.transform : [];
-    if (!text.trim() || transform.length < 6) {
-      return null;
-    }
-
-    const x = typeof transform[4] === 'number' ? transform[4] : 0;
-    const y = typeof transform[5] === 'number' ? transform[5] : 0;
-    const width = typeof pdfItem.width === 'number' ? pdfItem.width : text.length * 6;
-    const height = Math.abs(
-      typeof pdfItem.height === 'number' ? pdfItem.height : transform[0] || 12
-    );
-
-    return {
-      text,
-      x,
-      y,
-      width,
-      height: height || 12
-    };
-  }
-
-  private groupRunsIntoLines(runs: PdfTextRun[]) {
-    const lines: PdfTextLine[] = [];
-
-    for (const run of runs) {
-      const matchingLine = lines.find((line) => {
-        const tolerance = Math.max(2.5, Math.min(line.height, run.height) * 0.45);
-        return Math.abs(line.y - run.y) <= tolerance;
-      });
-
-      if (!matchingLine) {
-        lines.push({
-          y: run.y,
-          height: run.height,
-          runs: [run]
-        });
-        continue;
-      }
-
-      matchingLine.runs.push(run);
-      matchingLine.y = (matchingLine.y + run.y) / 2;
-      matchingLine.height = Math.max(matchingLine.height, run.height);
-    }
-
-    return lines
-      .map((line) => ({
-        ...line,
-        runs: [...line.runs].sort((left, right) => left.x - right.x)
-      }))
-      .sort((left, right) => right.y - left.y);
-  }
-
-  private buildLineText(line: PdfTextLine, pageMinX: number) {
-    if (line.runs.length === 0) {
-      return '';
-    }
-
-    const firstRun = line.runs[0];
-    const averageCharWidth = this.getAverageCharWidth(line.runs);
-    const indentGap = Math.max(0, firstRun.x - pageMinX);
-    const indentSpaces =
-      indentGap > averageCharWidth * 2
-        ? ' '.repeat(Math.min(12, Math.round(indentGap / Math.max(averageCharWidth, 4))))
-        : '';
-
-    let text = indentSpaces + firstRun.text.trimEnd();
-    let previousRun = firstRun;
-
-    for (const run of line.runs.slice(1)) {
-      const previousEnd = previousRun.x + previousRun.width;
-      const horizontalGap = Math.max(0, run.x - previousEnd);
-      const currentAverageCharWidth = this.getAverageCharWidth([previousRun, run]);
-
-      if (horizontalGap > currentAverageCharWidth * 0.3 && !text.endsWith(' ')) {
-        const spaces = Math.max(
-          1,
-          Math.min(8, Math.round(horizontalGap / Math.max(currentAverageCharWidth, 4)))
-        );
-        text += ' '.repeat(spaces);
-      }
-
-      text += run.text.trimEnd();
-      previousRun = run;
-    }
-
-    return text.replace(/[ \t]+$/g, '');
-  }
-
-  private getAverageCharWidth(runs: PdfTextRun[]) {
-    const totalCharacters = runs.reduce(
-      (count, run) => count + Math.max(run.text.trim().length, 1),
-      0
-    );
-    const totalWidth = runs.reduce((width, run) => width + Math.max(run.width, run.height * 0.5), 0);
-
-    return totalWidth / Math.max(totalCharacters, 1);
-  }
 }

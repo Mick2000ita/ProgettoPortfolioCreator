@@ -1,5 +1,9 @@
-<div class="app-shell">
-  <aside class="side-nav">
+<div
+  class="app-shell"
+  [class.app-shell-editor]="isEditorRoute()"
+  [style.--editor-layout-bg]="isEditorRoute() ? editorBackgroundColor() : null"
+>
+  <aside class="side-nav" [class.side-nav-editor]="isEditorRoute()">
     <a
       routerLink="/profile"
       routerLinkActive="active-link"
@@ -20,22 +24,58 @@
       </div>
     </a>
 
-    <nav class="nav-links">
-      <a
-        routerLink="/home"
-        routerLinkActive="active-link"
-        [routerLinkActiveOptions]="{ exact: true }"
-        class="nav-link"
-      >
-        <span class="pi pi-home"></span>
-        <span>Home</span>
-      </a>
+    <div class="side-nav-main">
+      <nav class="nav-links">
+        <a
+          routerLink="/home"
+          routerLinkActive="active-link"
+          [routerLinkActiveOptions]="{ exact: true }"
+          class="nav-link"
+        >
+          <span class="pi pi-home"></span>
+          <span>Home</span>
+        </a>
 
-      <a routerLink="/portfolios" routerLinkActive="active-link" class="nav-link">
-        <span class="pi pi-briefcase"></span>
-        <span>Portfolio</span>
-      </a>
-    </nav>
+        <a routerLink="/portfolios" routerLinkActive="active-link" class="nav-link">
+          <span class="pi pi-briefcase"></span>
+          <span>Portfolio</span>
+        </a>
+      </nav>
+
+      @if (isEditorRoute()) {
+        <section class="editor-hierarchy">
+          <div class="editor-hierarchy-head">
+            <div class="editor-hierarchy-kicker">Editor</div>
+            <strong>Gerarchia</strong>
+            <span>{{ editorNodeCount() }} nodi</span>
+          </div>
+
+          @if (editorTreeNodes().length === 0) {
+            <div class="editor-hierarchy-empty">
+              <strong>Struttura vuota</strong>
+              <p>Usa il pulsante `+` nell'editor per aggiungere il primo contenuto.</p>
+            </div>
+          } @else {
+            <div class="editor-tree-shell">
+              <p-tree
+                [value]="editorTreeNodes()"
+                selectionMode="single"
+                [selection]="selectedEditorTreeNode()"
+                (selectionChange)="onEditorSelectionChange($event)"
+                [draggableNodes]="true"
+                [droppableNodes]="true"
+                draggableScope="portfolio-editor"
+                droppableScope="portfolio-editor"
+                [filter]="true"
+                filterPlaceholder="Cerca nodo"
+                styleClass="editor-hierarchy-tree"
+                (onNodeDrop)="onEditorNodeDrop($event)"
+              />
+            </div>
+          }
+        </section>
+      }
+    </div>
 
     <button type="button" class="nav-link nav-link-button logout-link" (click)="logout()">
       <span class="pi pi-sign-out"></span>

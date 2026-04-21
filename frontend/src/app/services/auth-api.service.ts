@@ -46,6 +46,13 @@ export interface PortfolioModuleDto {
   values?: string[];
   fileName?: string;
   fileData?: string;
+  layout?: {
+    columnStart?: number;
+    rowStart?: number;
+    columnSpan?: number;
+    rowSpan?: number;
+  };
+  children?: PortfolioModuleDto[];
 }
 
 export interface CreatePortfolioRequestDto {
