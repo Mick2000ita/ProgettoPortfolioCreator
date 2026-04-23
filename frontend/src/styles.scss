@@ -27,3 +27,11 @@ app-root {
   display: block;
   min-height: 100vh;
 }
+
+:root {
+  --portfolio-canvas-max-width: 1180px;
+  --portfolio-page-padding: 2rem;
+  --portfolio-page-padding-mobile: 1.15rem;
+  --portfolio-grid-gap: 1rem;
+  --portfolio-grid-row-height: 56px;
+}

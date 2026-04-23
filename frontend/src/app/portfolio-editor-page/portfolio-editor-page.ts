@@ -1,28 +1,24 @@
-import { NgTemplateOutlet, isPlatformBrowser } from '@angular/common';
+import { NgStyle, isPlatformBrowser } from '@angular/common';
 import {
   Component,
-  DestroyRef,
+  ElementRef,
   HostListener,
   OnInit,
   PLATFORM_ID,
+  ViewChild,
   computed,
-  effect,
   inject,
-  signal
+  signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TreeNode } from 'primeng/api';
-import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
-import { Popover } from 'primeng/popover';
-import { PopoverModule } from 'primeng/popover';
 import { TextareaModule } from 'primeng/textarea';
 import {
   AuthApiService,
   CreatePortfolioRequestDto,
-  PortfolioModuleDto
+  PortfolioModuleDto,
 } from '../services/auth-api.service';
 import { PdfImportService } from '../services/pdf-import.service';
 import {
@@ -31,85 +27,137 @@ import {
   DEFAULT_BACKGROUND_COLOR,
   EditorNodeData,
   EditorNodeLayout,
+  EditorNodeTextStyle,
   PORTFOLIO_EDITOR_CONTENT_OPTIONS,
-  PortfolioEditorStateService
+  PortfolioEditorStateService,
+  resolveTextStyle,
+  supportsTextFormatting,
 } from '../services/portfolio-editor-state.service';
 
-interface PreviewInteractionState {
-  mode: 'move' | 'resize-x' | 'resize-y' | 'resize-both';
-  nodeKey: string;
+const CANVAS_COLUMNS = 48;
+const CANVAS_ROW_HEIGHT = 18;
+const MIN_CANVAS_ROWS = 72;
+const MAX_CANVAS_ROWS = 420;
+const FREEFORM_LAYOUT_MARKER = 'freeform-canvas-v2';
+const LEGACY_COLUMN_SCALE = 4;
+const LEGACY_ROW_SCALE = 3;
+const PORTFOLIO_PREVIEW_STORAGE_KEY = 'portfolio-editor-preview';
+
+interface CanvasTarget {
+  column: number;
+  row: number;
+  layout: EditorNodeLayout;
+}
+
+interface CreateInteraction {
+  mode: 'create';
   pointerId: number;
+  type: ContentType;
+  clientX: number;
+  clientY: number;
+  target: CanvasTarget | null;
+}
+
+interface TransformInteraction {
+  mode: 'move' | 'resize';
+  pointerId: number;
+  nodeKey: string;
   startX: number;
   startY: number;
   initialLayout: EditorNodeLayout;
-  columnWidth: number;
-  rowHeight: number;
+  columnStep: number;
+  rowStep: number;
+  resizeHandle?: ResizeHandlePosition;
 }
 
-const GRID_COLUMNS = 12;
-const GRID_ROW_HEIGHT = 56;
-const MAX_GRID_ROW_SPAN = 240;
+type EditorInteraction = CreateInteraction | TransformInteraction;
+type ResizeHandlePosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+interface StatRow {
+  value: string;
+  label: string;
+  detail: string;
+}
+
+type TextStyleField = keyof EditorNodeTextStyle;
 
 @Component({
   selector: 'app-portfolio-editor-page',
-  imports: [
-    RouterLink,
-    ReactiveFormsModule,
-    ButtonModule,
-    InputTextModule,
-    TextareaModule,
-    PopoverModule,
-    NgTemplateOutlet
-  ],
+  imports: [RouterLink, ReactiveFormsModule, InputTextModule, TextareaModule, NgStyle],
   templateUrl: './portfolio-editor-page.html',
-  styleUrl: './portfolio-editor-page.scss'
+  styleUrl: './portfolio-editor-page.scss',
 })
 export class PortfolioEditorPage implements OnInit {
+  @ViewChild('canvasSurface') private canvasSurface?: ElementRef<HTMLElement>;
+
   private readonly formBuilder = inject(FormBuilder);
-  private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly authApiService = inject(AuthApiService);
   private readonly pdfImportService = inject(PdfImportService);
   private readonly portfolioEditorStateService = inject(PortfolioEditorStateService);
+  private lastToolbarCreateAt = 0;
 
-  private previewInteraction: PreviewInteractionState | null = null;
+  protected readonly portfolioForm = this.formBuilder.nonNullable.group({
+    title: ['', [Validators.required]],
+  });
 
   protected readonly isSubmitting = signal(false);
   protected readonly isExtractingCv = signal(false);
   protected readonly isLoadingPortfolio = signal(false);
-  protected readonly extractionError = signal<string | null>(null);
   protected readonly loadError = signal<string | null>(null);
+  protected readonly extractionError = signal<string | null>(null);
   protected readonly editingSlug = signal<string | null>(null);
-  protected readonly treeNodes = this.portfolioEditorStateService.treeNodes;
-  protected readonly previewNodes = computed(() => this.collectRenderableNodes(this.treeNodes()));
-  protected readonly hasPreviewContent = computed(() => this.previewNodes().length > 0);
+  protected readonly interaction = signal<EditorInteraction | null>(null);
   protected readonly contentOptions: ContentOption[] = PORTFOLIO_EDITOR_CONTENT_OPTIONS;
-  protected readonly addableContentOptions = this.contentOptions.filter(
-    (option) => option.value !== 'background'
+  protected readonly toolbarTools = this.contentOptions.filter((option) => option.value !== 'background');
+  protected readonly treeNodes = this.portfolioEditorStateService.treeNodes;
+  protected readonly selectedTreeNode = this.portfolioEditorStateService.selectedTreeNode;
+  protected readonly selectedNodeData = computed(() => this.selectedTreeNode()?.data ?? null);
+  protected readonly pageNodes = computed(() =>
+    this.treeNodes().filter((node) => node.data?.type && node.data.type !== 'background'),
   );
-
-  protected readonly portfolioForm = this.formBuilder.nonNullable.group({
-    title: ['', [Validators.required]]
-  });
-
-  protected readonly nodeEditorForm = this.formBuilder.nonNullable.group({
-    textValue: [''],
-    colorValue: [DEFAULT_BACKGROUND_COLOR]
-  });
-
-  protected readonly slugPreview = computed(() => this.slugify(this.portfolioForm.controls.title.value));
   protected readonly backgroundColor = computed(() => {
-    const rootBackgroundNode = this.treeNodes().find((node) => node.data?.type === 'background');
-    return rootBackgroundNode?.data?.colorValue || DEFAULT_BACKGROUND_COLOR;
+    const backgroundNode = this.treeNodes().find((node) => node.data?.type === 'background');
+    return backgroundNode?.data?.colorValue || DEFAULT_BACKGROUND_COLOR;
   });
+  protected readonly slugPreview = computed(() =>
+    this.slugify(this.portfolioForm.controls.title.value),
+  );
+  protected readonly canvasRowCount = computed(() => {
+    const bottomEdge = this.pageNodes().reduce((maxBottom, node) => {
+      const layout = node.data?.layout;
+      if (!layout) {
+        return maxBottom;
+      }
 
-  constructor() {
-    effect(() => {
-      this.patchInspectorForm(this.portfolioEditorStateService.selectedTreeNode());
-    });
-  }
+      return Math.max(maxBottom, layout.rowStart + layout.rowSpan + 4);
+    }, MIN_CANVAS_ROWS);
+
+    return Math.min(MAX_CANVAS_ROWS, Math.max(MIN_CANVAS_ROWS, bottomEdge));
+  });
+  protected readonly dragPreviewLayout = computed(() => {
+    const currentInteraction = this.interaction();
+    if (currentInteraction?.mode !== 'create') {
+      return null;
+    }
+
+    return currentInteraction.target?.layout ?? null;
+  });
+  protected readonly dragGhost = computed(() => {
+    const currentInteraction = this.interaction();
+    if (currentInteraction?.mode !== 'create') {
+      return null;
+    }
+
+    return {
+      label: this.getContentTypeLabel(currentInteraction.type),
+      x: currentInteraction.clientX + 18,
+      y: currentInteraction.clientY + 18,
+      active: Boolean(currentInteraction.target),
+    };
+  });
 
   ngOnInit() {
     if (!isPlatformBrowser(this.platformId)) {
@@ -117,15 +165,6 @@ export class PortfolioEditorPage implements OnInit {
     }
 
     this.portfolioEditorStateService.reset();
-
-    this.nodeEditorForm.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((value) =>
-        this.applyInspectorChanges({
-          textValue: value.textValue ?? '',
-          colorValue: value.colorValue ?? DEFAULT_BACKGROUND_COLOR
-        })
-      );
 
     const slug = this.route.snapshot.paramMap.get('slug');
     if (!slug) {
@@ -139,44 +178,62 @@ export class PortfolioEditorPage implements OnInit {
 
   @HostListener('window:pointermove', ['$event'])
   protected onWindowPointerMove(event: PointerEvent) {
-    if (!this.previewInteraction || event.pointerId !== this.previewInteraction.pointerId) {
+    const currentInteraction = this.interaction();
+    if (!currentInteraction || event.pointerId !== currentInteraction.pointerId) {
       return;
     }
 
-    const node = this.findNodeByKey(this.treeNodes(), this.previewInteraction.nodeKey);
+    if (currentInteraction.mode === 'create') {
+      this.interaction.set({
+        ...currentInteraction,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        target: this.getCanvasTarget(event.clientX, event.clientY, currentInteraction.type),
+      });
+      return;
+    }
+
+    const node = this.findNodeByKey(currentInteraction.nodeKey);
     if (!node?.data) {
-      this.previewInteraction = null;
+      this.interaction.set(null);
       return;
     }
 
     event.preventDefault();
 
     const deltaColumns = Math.round(
-      (event.clientX - this.previewInteraction.startX) /
-        Math.max(this.previewInteraction.columnWidth, 1)
+      (event.clientX - currentInteraction.startX) / Math.max(currentInteraction.columnStep, 1),
     );
-    const deltaRows = Math.round(
-      (event.clientY - this.previewInteraction.startY) /
-        this.previewInteraction.rowHeight
-    );
+    const deltaRows = Math.round((event.clientY - currentInteraction.startY) / currentInteraction.rowStep);
+    const nextLayout = { ...currentInteraction.initialLayout };
 
-    const nextLayout = { ...this.previewInteraction.initialLayout };
-
-    switch (this.previewInteraction.mode) {
-      case 'move':
-        nextLayout.columnStart = this.previewInteraction.initialLayout.columnStart + deltaColumns;
-        nextLayout.rowStart = this.previewInteraction.initialLayout.rowStart + deltaRows;
-        break;
-      case 'resize-x':
-        nextLayout.columnSpan = this.previewInteraction.initialLayout.columnSpan + deltaColumns;
-        break;
-      case 'resize-y':
-        nextLayout.rowSpan = this.previewInteraction.initialLayout.rowSpan + deltaRows;
-        break;
-      case 'resize-both':
-        nextLayout.columnSpan = this.previewInteraction.initialLayout.columnSpan + deltaColumns;
-        nextLayout.rowSpan = this.previewInteraction.initialLayout.rowSpan + deltaRows;
-        break;
+    if (currentInteraction.mode === 'move') {
+      nextLayout.columnStart = currentInteraction.initialLayout.columnStart + deltaColumns;
+      nextLayout.rowStart = currentInteraction.initialLayout.rowStart + deltaRows;
+    } else {
+      switch (currentInteraction.resizeHandle ?? 'bottom-right') {
+        case 'top-left':
+          nextLayout.columnStart = currentInteraction.initialLayout.columnStart + deltaColumns;
+          nextLayout.columnSpan = currentInteraction.initialLayout.columnSpan - deltaColumns;
+          nextLayout.rowStart = currentInteraction.initialLayout.rowStart + deltaRows;
+          nextLayout.rowSpan = currentInteraction.initialLayout.rowSpan - deltaRows;
+          break;
+        case 'top-right':
+          nextLayout.columnSpan = currentInteraction.initialLayout.columnSpan + deltaColumns;
+          nextLayout.rowStart = currentInteraction.initialLayout.rowStart + deltaRows;
+          nextLayout.rowSpan = currentInteraction.initialLayout.rowSpan - deltaRows;
+          break;
+        case 'bottom-left':
+          nextLayout.columnStart = currentInteraction.initialLayout.columnStart + deltaColumns;
+          nextLayout.columnSpan = currentInteraction.initialLayout.columnSpan - deltaColumns;
+          nextLayout.rowSpan = currentInteraction.initialLayout.rowSpan + deltaRows;
+          break;
+        case 'bottom-right':
+        default:
+          nextLayout.columnSpan = currentInteraction.initialLayout.columnSpan + deltaColumns;
+          nextLayout.rowSpan = currentInteraction.initialLayout.rowSpan + deltaRows;
+          break;
+      }
     }
 
     node.data.layout = this.normalizeLayout(node.data.type, nextLayout);
@@ -186,123 +243,395 @@ export class PortfolioEditorPage implements OnInit {
   @HostListener('window:pointerup', ['$event'])
   @HostListener('window:pointercancel', ['$event'])
   protected onWindowPointerUp(event: PointerEvent) {
-    if (!this.previewInteraction || event.pointerId !== this.previewInteraction.pointerId) {
+    const currentInteraction = this.interaction();
+    if (!currentInteraction || event.pointerId !== currentInteraction.pointerId) {
       return;
     }
 
-    this.previewInteraction = null;
+    if (currentInteraction.mode === 'create' && currentInteraction.target) {
+      this.lastToolbarCreateAt = Date.now();
+      this.createNodeAtTarget(currentInteraction.type, currentInteraction.target);
+    }
+
+    this.interaction.set(null);
   }
 
-  protected get selectedTreeNode() {
-    return this.portfolioEditorStateService.selectedTreeNode();
-  }
-
-  protected get selectedNodeData() {
-    return this.selectedTreeNode?.data ?? null;
-  }
-
-  protected get selectedNodeType() {
-    return this.selectedTreeNode?.data?.type ?? null;
-  }
-
-  protected get selectedNodeChildren() {
-    return this.selectedTreeNode?.children ?? [];
-  }
-
-  protected addNode(type: ContentType, popover?: Popover) {
-    this.portfolioEditorStateService.addNode(type);
-    popover?.hide();
-  }
-
-  protected removeSelectedNode() {
-    this.portfolioEditorStateService.removeSelectedNode();
-  }
-
-  protected isSelectedPreviewNode(node: TreeNode<EditorNodeData>) {
-    return node.key === this.selectedTreeNode?.key;
-  }
-
-  protected previewNodeStyle(node: TreeNode<EditorNodeData>) {
-    const layout = node.data?.layout ?? this.portfolioEditorStateService.getDefaultLayout('description');
-    return {
-      gridColumn: `${layout.columnStart} / span ${layout.columnSpan}`,
-      gridRow: `${layout.rowStart} / span ${layout.rowSpan}`
-    };
-  }
-
-  protected selectPreviewNode(node: TreeNode<EditorNodeData>, event?: Event) {
-    event?.stopPropagation();
-    this.portfolioEditorStateService.selectNodeByKey(node.key ?? null);
-  }
-
-  protected startNodeMove(event: PointerEvent, node: TreeNode<EditorNodeData>) {
-    this.startPreviewInteraction(event, node, 'move');
-  }
-
-  protected startNodeResize(
-    event: PointerEvent,
-    node: TreeNode<EditorNodeData>,
-    mode: 'resize-x' | 'resize-y' | 'resize-both'
-  ) {
-    this.startPreviewInteraction(event, node, mode);
-  }
-
-  protected visibleNodeChildren(node: TreeNode<EditorNodeData>) {
-    return this.collectRenderableNodes(node.children ?? []);
+  @HostListener('window:keydown.escape')
+  protected onWindowEscape() {
+    this.interaction.set(null);
   }
 
   protected trackNode(_index: number, node: TreeNode<EditorNodeData>) {
-    return node.key ?? node.label;
+    return node.key ?? node.data?.label ?? _index;
   }
 
   protected getContentTypeLabel(type: ContentType) {
     return this.portfolioEditorStateService.getContentTypeLabel(type);
   }
 
+  protected isSelectedNode(node: TreeNode<EditorNodeData>) {
+    return node.key === this.selectedTreeNode()?.key;
+  }
+
+  protected isDraggingTool(type: ContentType) {
+    const currentInteraction = this.interaction();
+    return currentInteraction?.mode === 'create' && currentInteraction.type === type;
+  }
+
+  protected getCanvasItemStyle(node: TreeNode<EditorNodeData>) {
+    const layout = node.data?.layout ?? this.getDefaultLayout('description');
+    return {
+      gridColumn: `${layout.columnStart} / span ${layout.columnSpan}`,
+      gridRow: `${layout.rowStart} / span ${layout.rowSpan}`,
+    };
+  }
+
+  protected onCanvasPointerDown(event: PointerEvent) {
+    if (event.target === event.currentTarget) {
+      this.portfolioEditorStateService.selectNodeByKey(null);
+    }
+  }
+
+  protected selectNode(node: TreeNode<EditorNodeData>, event?: Event) {
+    event?.stopPropagation();
+    this.portfolioEditorStateService.selectNodeByKey(node.key ?? null);
+  }
+
+  protected startToolbarDrag(event: PointerEvent, type: ContentType) {
+    event.preventDefault();
+
+    this.interaction.set({
+      mode: 'create',
+      pointerId: event.pointerId,
+      type,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      target: this.getCanvasTarget(event.clientX, event.clientY, type),
+    });
+  }
+
+  protected addNodeFromToolbar(type: ContentType) {
+    if (Date.now() - this.lastToolbarCreateAt < 250) {
+      return;
+    }
+
+    const layout = this.buildQuickAddLayout(type, this.pageNodes().length);
+    this.lastToolbarCreateAt = Date.now();
+    this.createNodeAtTarget(type, {
+      column: layout.columnStart,
+      row: layout.rowStart,
+      layout,
+    });
+  }
+
+  protected startNodeMove(event: PointerEvent, node: TreeNode<EditorNodeData>) {
+    this.startTransformInteraction(event, node, 'move');
+  }
+
+  protected startNodeResize(event: PointerEvent, node: TreeNode<EditorNodeData>) {
+    this.startTransformInteraction(event, node, 'resize', 'bottom-right');
+  }
+
+  protected startNodeResizeFromCorner(
+    event: PointerEvent,
+    node: TreeNode<EditorNodeData>,
+    corner: ResizeHandlePosition,
+  ) {
+    this.startTransformInteraction(event, node, 'resize', corner);
+  }
+
+  protected removeSelectedNode() {
+    this.portfolioEditorStateService.removeSelectedNode();
+  }
+
   protected canRemoveSelectedNode() {
     return this.portfolioEditorStateService.canRemoveSelectedNode();
   }
 
-  protected getPreviewHeadingTag(depth: number) {
-    return depth === 0 ? 'h1' : depth === 1 ? 'h2' : 'h3';
+  protected updateBackgroundColor(event: Event) {
+    const backgroundNode = this.treeNodes().find((node) => node.data?.type === 'background');
+    if (!backgroundNode?.data) {
+      return;
+    }
+
+    backgroundNode.data.colorValue = (event.target as HTMLInputElement).value || DEFAULT_BACKGROUND_COLOR;
+    backgroundNode.data.helperText = FREEFORM_LAYOUT_MARKER;
+    this.portfolioEditorStateService.refreshTree();
+  }
+
+  protected updateSelectedLabel(event: Event) {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode?.data) {
+      return;
+    }
+
+    const value = (event.target as HTMLInputElement).value.trim();
+    selectedNode.label = value || this.getContentTypeLabel(selectedNode.data.type);
+    selectedNode.data.label = selectedNode.label;
+    this.refreshSelectedNode(selectedNode.key ?? null);
+  }
+
+  protected updateSelectedText(event: Event) {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode?.data) {
+      return;
+    }
+
+    selectedNode.data.textValue = (event.target as HTMLInputElement | HTMLTextAreaElement).value;
+    this.refreshSelectedNode(selectedNode.key ?? null);
+  }
+
+  protected updateNodeText(node: TreeNode<EditorNodeData>, event: Event) {
+    if (!node.data) {
+      return;
+    }
+
+    node.data.textValue = (event.target as HTMLInputElement | HTMLTextAreaElement).value;
+    this.refreshSelectedNode(node.key ?? null);
+  }
+
+  protected updateSelectedSubtitle(event: Event) {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode?.data) {
+      return;
+    }
+
+    selectedNode.data.subtitle = (event.target as HTMLInputElement).value;
+    this.refreshSelectedNode(selectedNode.key ?? null);
+  }
+
+  protected updateNodeSubtitle(node: TreeNode<EditorNodeData>, event: Event) {
+    if (!node.data) {
+      return;
+    }
+
+    node.data.subtitle = (event.target as HTMLInputElement).value;
+    this.refreshSelectedNode(node.key ?? null);
+  }
+
+  protected updateSelectedButtonLabel(event: Event) {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode?.data) {
+      return;
+    }
+
+    selectedNode.data.buttonLabel = (event.target as HTMLInputElement).value;
+    this.refreshSelectedNode(selectedNode.key ?? null);
+  }
+
+  protected updateNodeButtonLabel(node: TreeNode<EditorNodeData>, event: Event) {
+    if (!node.data) {
+      return;
+    }
+
+    node.data.buttonLabel = (event.target as HTMLInputElement).value;
+    this.refreshSelectedNode(node.key ?? null);
+  }
+
+  protected updateSelectedUrl(event: Event) {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode?.data) {
+      return;
+    }
+
+    selectedNode.data.url = (event.target as HTMLInputElement).value;
+    this.refreshSelectedNode(selectedNode.key ?? null);
+  }
+
+  protected updateNodeUrl(node: TreeNode<EditorNodeData>, event: Event) {
+    if (!node.data) {
+      return;
+    }
+
+    node.data.url = (event.target as HTMLInputElement).value;
+    this.refreshSelectedNode(node.key ?? null);
+  }
+
+  protected supportsTextFormatting(type: ContentType) {
+    return supportsTextFormatting(type);
+  }
+
+  protected getResolvedTextStyle(nodeData: EditorNodeData) {
+    return resolveTextStyle(nodeData.type, nodeData.textStyle);
+  }
+
+  protected getCanvasTextModuleStyle(nodeData: EditorNodeData) {
+    const textStyle = this.getResolvedTextStyle(nodeData);
+    const style: Record<string, string> = {
+      '--text-font-size': `${textStyle.fontSize}px`,
+      '--text-align': textStyle.textAlign,
+      '--text-justify': this.getTextJustify(textStyle.textAlign),
+      '--text-vertical-align': this.getVerticalAlignValue(textStyle.verticalAlign),
+      '--text-font-weight': textStyle.bold ? '700' : '400',
+      '--text-font-style': textStyle.italic ? 'italic' : 'normal',
+    };
+
+    if (textStyle.textColor) {
+      style['--text-color'] = textStyle.textColor;
+    }
+
+    return style;
+  }
+
+  protected updateSelectedTextStyleField(field: TextStyleField, value: EditorNodeTextStyle[TextStyleField]) {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode?.data || !this.supportsTextFormatting(selectedNode.data.type)) {
+      return;
+    }
+
+    selectedNode.data.textStyle = {
+      ...selectedNode.data.textStyle,
+      [field]: value,
+    };
+    this.refreshSelectedNode(selectedNode.key ?? null);
+  }
+
+  protected updateSelectedTextSize(event: Event) {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode?.data || !this.supportsTextFormatting(selectedNode.data.type)) {
+      return;
+    }
+
+    const fallback = this.getResolvedTextStyle(selectedNode.data).fontSize;
+    const value = this.readNumberInput(event, fallback);
+    this.updateSelectedTextStyleField('fontSize', Math.min(Math.max(value, 12), 120));
+  }
+
+  protected updateSelectedTextColor(event: Event) {
+    this.updateSelectedTextStyleField('textColor', (event.target as HTMLInputElement).value);
+  }
+
+  protected updateSelectedTextAlign(value: EditorNodeTextStyle['textAlign']) {
+    this.updateSelectedTextStyleField('textAlign', value);
+  }
+
+  protected updateSelectedVerticalAlign(value: EditorNodeTextStyle['verticalAlign']) {
+    this.updateSelectedTextStyleField('verticalAlign', value);
+  }
+
+  protected toggleSelectedBold() {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode?.data || !this.supportsTextFormatting(selectedNode.data.type)) {
+      return;
+    }
+
+    this.updateSelectedTextStyleField('bold', !this.getResolvedTextStyle(selectedNode.data).bold);
+  }
+
+  protected toggleSelectedItalic() {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode?.data || !this.supportsTextFormatting(selectedNode.data.type)) {
+      return;
+    }
+
+    this.updateSelectedTextStyleField('italic', !this.getResolvedTextStyle(selectedNode.data).italic);
+  }
+
+  protected updateSelectedLayout(
+    field: keyof EditorNodeLayout,
+    event: Event,
+    fallback: number,
+  ) {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode?.data) {
+      return;
+    }
+
+    const nextValue = this.readNumberInput(event, fallback);
+    selectedNode.data.layout = this.normalizeLayout(selectedNode.data.type, {
+      ...selectedNode.data.layout,
+      [field]: nextValue,
+    });
+    this.refreshSelectedNode(selectedNode.key ?? null);
   }
 
   protected getTableRows(textValue: string) {
-    return this.parseTableRows(textValue);
+    return textValue
+      .split('\n')
+      .map((row) => row.split(';').map((cell) => cell.trim()))
+      .filter((row) => row.some((cell) => Boolean(cell)));
+  }
+
+  protected getStatRows(textValue: string): StatRow[] {
+    return textValue
+      .split('\n')
+      .map((row) => row.split(';').map((cell) => cell.trim()))
+      .filter((row) => row.some((cell) => Boolean(cell)))
+      .map(([value = '', label = '', detail = '']) => ({
+        value,
+        label,
+        detail,
+      }))
+      .filter((row) => Boolean(row.value || row.label || row.detail));
+  }
+
+  protected getPrimaryImage(images: string[]) {
+    return images[0] ?? null;
   }
 
   protected async onImagesSelected(event: Event) {
-    const selectedNode = this.selectedTreeNode;
-    const files = Array.from((event.target as HTMLInputElement).files ?? []);
-    if (!selectedNode?.data || selectedNode.data.type !== 'image' || files.length === 0) {
+    const selectedNode = this.selectedTreeNode();
+    const inputElement = event.target as HTMLInputElement;
+    const files = Array.from(inputElement.files ?? []);
+    if (
+      !selectedNode?.data ||
+      (selectedNode.data.type !== 'image' && selectedNode.data.type !== 'carousel') ||
+      files.length === 0
+    ) {
       return;
     }
 
     const images = await Promise.all(
-      files.map((file) => this.pdfImportService.readFileAsDataUrl(file))
+      files.map((file) => this.pdfImportService.readFileAsDataUrl(file)),
     );
-    selectedNode.data.images = [
-      ...selectedNode.data.images,
-      ...images.filter((image): image is string => Boolean(image))
-    ];
+    const nextImages = images.filter((image): image is string => Boolean(image));
 
+    if (selectedNode.data.type === 'image') {
+      selectedNode.data.images = nextImages.length > 0 ? [nextImages[0]] : selectedNode.data.images;
+      inputElement.value = '';
+      this.refreshSelectedNode(selectedNode.key ?? null);
+      return;
+    }
+
+    selectedNode.data.images = [...selectedNode.data.images, ...nextImages];
+    inputElement.value = '';
     this.refreshSelectedNode(selectedNode.key ?? null);
   }
 
   protected removeImage(imageIndex: number) {
-    const selectedNode = this.selectedTreeNode;
-    if (!selectedNode?.data || selectedNode.data.type !== 'image') {
+    const selectedNode = this.selectedTreeNode();
+    if (
+      !selectedNode?.data ||
+      (selectedNode.data.type !== 'image' && selectedNode.data.type !== 'carousel')
+    ) {
       return;
     }
 
     selectedNode.data.images = selectedNode.data.images.filter(
-      (_image, currentImageIndex) => currentImageIndex !== imageIndex
+      (_image, currentImageIndex) => currentImageIndex !== imageIndex,
     );
     this.refreshSelectedNode(selectedNode.key ?? null);
   }
 
+  protected moveImage(imageIndex: number, direction: -1 | 1) {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode?.data || selectedNode.data.type !== 'carousel') {
+      return;
+    }
+
+    const nextIndex = imageIndex + direction;
+    if (nextIndex < 0 || nextIndex >= selectedNode.data.images.length) {
+      return;
+    }
+
+    const nextImages = [...selectedNode.data.images];
+    [nextImages[imageIndex], nextImages[nextIndex]] = [nextImages[nextIndex], nextImages[imageIndex]];
+    selectedNode.data.images = nextImages;
+    this.refreshSelectedNode(selectedNode.key ?? null);
+  }
+
   protected async onCvSelected(event: Event) {
-    const selectedNode = this.selectedTreeNode;
+    const selectedNode = this.selectedTreeNode();
     const file = (event.target as HTMLInputElement).files?.[0];
     this.extractionError.set(null);
 
@@ -315,19 +644,46 @@ export class PortfolioEditorPage implements OnInit {
     try {
       const [fileData, importedCv] = await Promise.all([
         this.pdfImportService.readFileAsDataUrl(file),
-        this.pdfImportService.importCv(file)
+        this.pdfImportService.importCv(file),
       ]);
 
       selectedNode.data.fileData = fileData ?? '';
       selectedNode.data.fileName = file.name;
       selectedNode.data.textValue = importedCv.text;
-      this.ensureNodeFitsContent(selectedNode);
-      this.syncImportedCvAssetNodes(selectedNode, importedCv.images, importedCv.tables);
-
       this.refreshSelectedNode(selectedNode.key ?? null);
     } catch {
       this.extractionError.set(
-        'Non sono riuscito a importare correttamente il CV. Puoi riprovare con un altro PDF.'
+        'Non sono riuscito a leggere questo PDF. Prova con un altro file o incolla il testo manualmente.',
+      );
+    } finally {
+      this.isExtractingCv.set(false);
+    }
+  }
+
+  protected async onCvSelectedForNode(node: TreeNode<EditorNodeData>, event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    this.extractionError.set(null);
+
+    if (!node.data || node.data.type !== 'cv' || !file) {
+      return;
+    }
+
+    this.portfolioEditorStateService.selectNodeByKey(node.key ?? null);
+    this.isExtractingCv.set(true);
+
+    try {
+      const [fileData, importedCv] = await Promise.all([
+        this.pdfImportService.readFileAsDataUrl(file),
+        this.pdfImportService.importCv(file),
+      ]);
+
+      node.data.fileData = fileData ?? '';
+      node.data.fileName = file.name;
+      node.data.textValue = importedCv.text;
+      this.refreshSelectedNode(node.key ?? null);
+    } catch {
+      this.extractionError.set(
+        'Non sono riuscito a leggere questo PDF. Prova con un altro file o incolla il testo manualmente.',
       );
     } finally {
       this.isExtractingCv.set(false);
@@ -341,56 +697,77 @@ export class PortfolioEditorPage implements OnInit {
   }
 
   protected openLivePortfolio() {
+    const slug = this.editingSlug();
+    const payload = this.buildPortfolioPayload();
+    if (!slug || !payload) {
+      return;
+    }
+
     const previewWindow = window.open('about:blank', '_blank');
 
     if (previewWindow) {
       previewWindow.document.write(
-        '<!doctype html><title>Preview portfolio</title><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#081111;color:#eff6f2;font-family:sans-serif">Sto aprendo la preview del portfolio...</body>'
+        '<!doctype html><title>Preview portfolio</title><body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#0f1412;color:#f4f1e8;font-family:sans-serif">Sto aprendo il portfolio...</body>',
       );
       previewWindow.document.close();
     }
 
-    this.persistPortfolio((portfolio) => {
-      if (previewWindow) {
-        previewWindow.location.href = `/${portfolio.slug}`;
-      } else {
-        window.open(`/${portfolio.slug}`, '_blank');
-      }
-    }, () => {
-      previewWindow?.close();
-    });
+    this.writePreviewSnapshot(slug, payload);
+
+    if (previewWindow) {
+      previewWindow.location.href = `/${slug}?preview=1`;
+    } else {
+      window.location.assign(`/${slug}?preview=1`);
+    }
+
+    this.persistPortfolio();
   }
 
-  private startPreviewInteraction(
+  private startTransformInteraction(
     event: PointerEvent,
     node: TreeNode<EditorNodeData>,
-    mode: PreviewInteractionState['mode']
+    mode: TransformInteraction['mode'],
+    resizeHandle?: ResizeHandlePosition,
   ) {
-    if (!node.data || node.data.type === 'background' || !node.key) {
+    if (!node.key || !node.data) {
       return;
     }
 
-    const trigger = event.currentTarget as HTMLElement | null;
-    const grid = trigger?.closest('.preview-grid') as HTMLElement | null;
-    if (!grid) {
+    const canvasMetrics = this.getCanvasMetrics();
+    if (!canvasMetrics) {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-
-    const gridRect = grid.getBoundingClientRect();
     this.portfolioEditorStateService.selectNodeByKey(node.key);
-    this.previewInteraction = {
+
+    this.interaction.set({
       mode,
-      nodeKey: node.key,
       pointerId: event.pointerId,
+      nodeKey: node.key,
       startX: event.clientX,
       startY: event.clientY,
       initialLayout: { ...node.data.layout },
-      columnWidth: gridRect.width / GRID_COLUMNS,
-      rowHeight: GRID_ROW_HEIGHT
-    };
+      columnStep: canvasMetrics.columnStep,
+      rowStep: canvasMetrics.rowStep,
+      resizeHandle,
+    });
+  }
+
+  private createNodeAtTarget(type: ContentType, target: CanvasTarget) {
+    const backgroundNode = this.treeNodes().find((node) => node.data?.type === 'background');
+    const nextNode = this.portfolioEditorStateService.createTreeNode(type, {
+      layout: target.layout,
+    });
+    const nextRoots = this.treeNodes().filter((node) => node.data?.type !== 'background');
+
+    this.portfolioEditorStateService.setTreeNodes([
+      backgroundNode ?? this.createBackgroundNode(DEFAULT_BACKGROUND_COLOR),
+      ...nextRoots,
+      nextNode,
+    ]);
+    this.portfolioEditorStateService.selectNodeByKey(nextNode.key ?? null);
   }
 
   private loadPortfolio(slug: string) {
@@ -400,121 +777,144 @@ export class PortfolioEditorPage implements OnInit {
     this.authApiService.getMyPortfolio(slug).subscribe({
       next: (portfolio) => {
         this.portfolioForm.controls.title.setValue(portfolio.title);
+        this.portfolioEditorStateService.setActiveTemplateId(null);
         this.portfolioEditorStateService.setTreeNodes(this.deserializeNodes(portfolio.modules));
         this.isLoadingPortfolio.set(false);
 
-        const firstNode = this.previewNodes()[0] ?? this.treeNodes()[0] ?? null;
-        this.portfolioEditorStateService.onSelectionChange(firstNode);
+        const firstNode = this.pageNodes()[0] ?? null;
+        this.portfolioEditorStateService.selectNodeByKey(firstNode?.key ?? null);
       },
       error: () => {
         this.loadError.set('Non sono riuscito a caricare questo portfolio. Riprova tra poco.');
         this.isLoadingPortfolio.set(false);
-      }
+      },
     });
   }
 
   private deserializeNodes(modules: PortfolioModuleDto[]): TreeNode<EditorNodeData>[] {
-    return modules
-      .filter((module): module is PortfolioModuleDto & { type: ContentType } =>
-        this.isSupportedContentType(module.type)
-      )
-      .map((module) => {
-        const key =
-          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-            ? crypto.randomUUID()
-            : `node-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-        const type: ContentType = module.type;
-        const textValue = module.value ?? '';
-        const layout = this.expandLayoutForContent(
-          type,
-          textValue,
-          this.normalizeLayout(type, module.layout)
-        );
+    const flattenedModules = this.flattenModules(modules);
+    const backgroundModule = [...flattenedModules].reverse().find((module) => module.type === 'background');
+    const contentModules = flattenedModules.filter(
+      (module): module is PortfolioModuleDto & { type: ContentType } =>
+        this.isSupportedContentType(module.type) && module.type !== 'background',
+    );
+    const isFreeformCanvas = flattenedModules.some(
+      (module) => module.helperText === FREEFORM_LAYOUT_MARKER,
+    );
+    const shouldScaleLegacyModules =
+      !isFreeformCanvas && this.looksLikeLegacyLayout(contentModules);
+
+    return [
+      this.createBackgroundNode(backgroundModule?.value || DEFAULT_BACKGROUND_COLOR),
+      ...contentModules.map((module) => {
+        const normalizedType =
+          module.type === 'image' && (module.values?.length ?? 0) > 1 ? 'carousel' : module.type;
+        const normalizedImages =
+          normalizedType === 'image' ? (module.values?.slice(0, 1) ?? []) : (module.values ?? []);
+        const layout = shouldScaleLegacyModules
+          ? this.scaleLegacyLayout(normalizedType, module.layout)
+          : module.layout;
+
+        return this.portfolioEditorStateService.createTreeNode(normalizedType, {
+          label: module.label || this.getContentTypeLabel(normalizedType),
+          textValue: module.value ?? '',
+          subtitle: module.subtitle ?? '',
+          buttonLabel: module.buttonLabel ?? '',
+          url: module.url ?? '',
+          fileName: module.fileName ?? '',
+          fileData: module.fileData ?? '',
+          images: normalizedImages,
+          textStyle: module.textStyle,
+          helperText: module.helperText,
+          layout: this.normalizeLayout(normalizedType, layout),
+        });
+      }),
+    ];
+  }
+
+  private serializeNodes(nodes: TreeNode<EditorNodeData>[]): PortfolioModuleDto[] {
+    return nodes
+      .filter((node): node is TreeNode<EditorNodeData> & { data: EditorNodeData } => Boolean(node.data))
+      .map((node) => {
+        const data = node.data;
+
+        if (data.type === 'background') {
+          return {
+            type: 'background',
+            label: 'Background',
+            value: data.colorValue,
+            helperText: FREEFORM_LAYOUT_MARKER,
+            layout: {
+              columnStart: 1,
+              rowStart: 1,
+              columnSpan: CANVAS_COLUMNS,
+              rowSpan: 1,
+            },
+            children: [],
+          };
+        }
+
+        const baseModule: PortfolioModuleDto = {
+          type: data.type,
+          label: data.label,
+          layout: { ...data.layout },
+          children: [],
+        };
+
+        if (data.type === 'image') {
+          return {
+            ...baseModule,
+            values: data.images.length > 0 ? [data.images[0]] : [],
+          };
+        }
+
+        if (data.type === 'carousel') {
+          return {
+            ...baseModule,
+            values: [...data.images],
+          };
+        }
+
+        if (data.type === 'quote') {
+          return {
+            ...baseModule,
+            value: data.textValue,
+            subtitle: data.subtitle,
+            textStyle: data.textStyle,
+          };
+        }
+
+        if (data.type === 'cta') {
+          return {
+            ...baseModule,
+            value: data.textValue,
+            buttonLabel: data.buttonLabel,
+            url: data.url,
+            textStyle: data.textStyle,
+          };
+        }
+
+        if (data.type === 'cv') {
+          return {
+            ...baseModule,
+            value: data.textValue,
+            fileName: data.fileName,
+            fileData: data.fileData,
+            textStyle: data.textStyle,
+          };
+        }
 
         return {
-          key,
-          label: this.getContentTypeLabel(type),
-          icon: this.portfolioEditorStateService.getTreeNodeIcon(type),
-          expanded: true,
-          selectable: true,
-          draggable: type !== 'background',
-          droppable: true,
-          data: {
-            type,
-            label: this.getContentTypeLabel(type),
-            textValue,
-            colorValue:
-              type === 'background' ? module.value || DEFAULT_BACKGROUND_COLOR : DEFAULT_BACKGROUND_COLOR,
-            fileName: module.fileName ?? '',
-            fileData: module.fileData ?? '',
-            images: module.values ?? [],
-            importSourceKey: undefined,
-            layout
-          },
-          children: this.deserializeNodes(module.children ?? [])
+          ...baseModule,
+          value: data.textValue,
+          textStyle: this.supportsTextFormatting(data.type) ? data.textStyle : undefined,
         };
       });
   }
 
-  private serializeNodes(nodes: TreeNode<EditorNodeData>[]): PortfolioModuleDto[] {
-    return nodes.map((node) => {
-      const data = node.data!;
-      const basePayload = {
-        type: data.type,
-        label: data.label,
-        layout: { ...data.layout },
-        children: this.serializeNodes(node.children ?? [])
-      };
-
-      if (data.type === 'image') {
-        return {
-          ...basePayload,
-          values: data.images
-        };
-      }
-
-      if (data.type === 'background') {
-        return {
-          ...basePayload,
-          value: data.colorValue
-        };
-      }
-
-      if (data.type === 'cv') {
-        return {
-          ...basePayload,
-          value: data.textValue,
-          fileName: data.fileName,
-          fileData: data.fileData
-        };
-      }
-
-      return {
-        ...basePayload,
-        value: data.textValue
-      };
-    });
-  }
-
-  private applyInspectorChanges(value: { textValue: string; colorValue: string }) {
-    const selectedNode = this.selectedTreeNode;
-    if (!selectedNode?.data) {
-      return;
-    }
-
-    if (selectedNode.data.type === 'background') {
-      selectedNode.data.colorValue = value.colorValue;
-    } else {
-      selectedNode.data.textValue = value.textValue;
-      this.ensureNodeFitsContent(selectedNode);
-    }
-
-    this.refreshSelectedNode(selectedNode.key ?? null);
-  }
-
   private persistPortfolio(
     onSuccess?: (portfolio: { slug: string }) => void,
-    onError?: () => void
+    onError?: () => void,
   ) {
     const slug = this.editingSlug();
     const payload = this.buildPortfolioPayload();
@@ -534,7 +934,7 @@ export class PortfolioEditorPage implements OnInit {
       error: () => {
         this.isSubmitting.set(false);
         onError?.();
-      }
+      },
     });
   }
 
@@ -551,18 +951,260 @@ export class PortfolioEditorPage implements OnInit {
 
     return {
       title,
-      modules: this.serializeNodes(this.treeNodes())
+      modules: this.serializeNodes(this.treeNodes()),
     };
   }
 
-  private patchInspectorForm(node: TreeNode<EditorNodeData> | null) {
-    this.nodeEditorForm.patchValue(
-      {
-        textValue: node?.data?.textValue ?? '',
-        colorValue: node?.data?.colorValue ?? DEFAULT_BACKGROUND_COLOR
-      },
-      { emitEvent: false }
+  private persistPreviewSnapshot() {
+    const payload = this.buildPortfolioPayload();
+    const slug = this.editingSlug();
+    if (!payload || !slug || !this.canUseLocalStorage()) {
+      return;
+    }
+
+    this.writePreviewSnapshot(slug, payload);
+  }
+
+  private writePreviewSnapshot(slug: string, payload: CreatePortfolioRequestDto) {
+    if (!this.canUseLocalStorage()) {
+      return;
+    }
+
+    const previewSnapshot = {
+      title: payload.title,
+      slug,
+      public: true,
+      modules: payload.modules,
+      savedAt: Date.now(),
+    };
+
+    try {
+      window.localStorage.setItem(PORTFOLIO_PREVIEW_STORAGE_KEY, JSON.stringify(previewSnapshot));
+    } catch {
+      try {
+        window.localStorage.removeItem(PORTFOLIO_PREVIEW_STORAGE_KEY);
+      } catch {
+        // Preview navigation must keep working even when browser storage is unavailable.
+      }
+    }
+  }
+
+  private getCanvasTarget(clientX: number, clientY: number, type: ContentType): CanvasTarget | null {
+    const canvasMetrics = this.getCanvasMetrics();
+    if (!canvasMetrics) {
+      return null;
+    }
+
+    const { rect, columnStep } = canvasMetrics;
+    const insideCanvas =
+      clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+
+    if (!insideCanvas) {
+      return null;
+    }
+
+    const column = this.clampInteger(
+      Math.floor((clientX - rect.left) / Math.max(columnStep, 1)) + 1,
+      1,
+      CANVAS_COLUMNS,
+      1,
     );
+    const row = this.clampInteger(
+      Math.floor((clientY - rect.top) / CANVAS_ROW_HEIGHT) + 1,
+      1,
+      MAX_CANVAS_ROWS,
+      1,
+    );
+
+    return {
+      column,
+      row,
+      layout: this.buildLayoutAtPoint(type, column, row),
+    };
+  }
+
+  private getCanvasMetrics() {
+    const canvasElement = this.canvasSurface?.nativeElement;
+    if (!canvasElement) {
+      return null;
+    }
+
+    const rect = canvasElement.getBoundingClientRect();
+    return {
+      rect,
+      columnStep: rect.width / CANVAS_COLUMNS,
+      rowStep: CANVAS_ROW_HEIGHT,
+    };
+  }
+
+  private buildLayoutAtPoint(type: ContentType, column: number, row: number) {
+    const defaultLayout = this.getDefaultLayout(type);
+
+    return this.normalizeLayout(type, {
+      ...defaultLayout,
+      columnStart: column,
+      rowStart: row,
+    });
+  }
+
+  private buildQuickAddLayout(type: ContentType, existingNodeCount: number) {
+    const defaultLayout = this.getDefaultLayout(type);
+    const offsetCycle = existingNodeCount % 4;
+
+    return this.normalizeLayout(type, {
+      ...defaultLayout,
+      columnStart: Math.min(4 + offsetCycle * 3, CANVAS_COLUMNS - defaultLayout.columnSpan + 1),
+      rowStart: 4 + existingNodeCount * 4,
+    });
+  }
+
+  private getDefaultLayout(type: ContentType): EditorNodeLayout {
+    switch (type) {
+      case 'title':
+        return { columnStart: 3, rowStart: 3, columnSpan: 22, rowSpan: 8 };
+      case 'description':
+        return { columnStart: 3, rowStart: 12, columnSpan: 18, rowSpan: 12 };
+      case 'image':
+        return { columnStart: 22, rowStart: 12, columnSpan: 18, rowSpan: 16 };
+      case 'carousel':
+        return { columnStart: 19, rowStart: 12, columnSpan: 22, rowSpan: 18 };
+      case 'table':
+        return { columnStart: 5, rowStart: 20, columnSpan: 22, rowSpan: 14 };
+      case 'quote':
+        return { columnStart: 4, rowStart: 12, columnSpan: 20, rowSpan: 10 };
+      case 'stats':
+        return { columnStart: 4, rowStart: 12, columnSpan: 24, rowSpan: 10 };
+      case 'cta':
+        return { columnStart: 6, rowStart: 26, columnSpan: 28, rowSpan: 6 };
+      case 'cv':
+        return { columnStart: 7, rowStart: 8, columnSpan: 24, rowSpan: 20 };
+      case 'background':
+      default:
+        return { columnStart: 1, rowStart: 1, columnSpan: CANVAS_COLUMNS, rowSpan: 1 };
+    }
+  }
+
+  private normalizeLayout(
+    type: ContentType,
+    layout?: Partial<EditorNodeLayout> | null,
+  ): EditorNodeLayout {
+    const fallback = this.getDefaultLayout(type);
+    const minColumnSpan =
+      type === 'background'
+        ? CANVAS_COLUMNS
+        : type === 'title'
+          ? 12
+          : type === 'cta'
+            ? 14
+            : type === 'quote' || type === 'stats' || type === 'carousel'
+              ? 12
+              : 10;
+    const minRowSpan =
+      type === 'background'
+        ? 1
+        : type === 'title'
+          ? 6
+          : type === 'cta'
+            ? 4
+            : type === 'quote' || type === 'stats'
+              ? 6
+              : type === 'image'
+                ? 10
+                : 8;
+    const columnSpan = this.clampInteger(
+      layout?.columnSpan,
+      minColumnSpan,
+      CANVAS_COLUMNS,
+      fallback.columnSpan,
+    );
+    const columnStart = this.clampInteger(
+      layout?.columnStart,
+      1,
+      CANVAS_COLUMNS - columnSpan + 1,
+      fallback.columnStart,
+    );
+    const rowSpan = this.clampInteger(layout?.rowSpan, minRowSpan, MAX_CANVAS_ROWS, fallback.rowSpan);
+    const rowStart = this.clampInteger(
+      layout?.rowStart,
+      1,
+      MAX_CANVAS_ROWS - rowSpan + 1,
+      fallback.rowStart,
+    );
+
+    return {
+      columnStart,
+      rowStart,
+      columnSpan,
+      rowSpan,
+    };
+  }
+
+  private scaleLegacyLayout(
+    type: ContentType,
+    layout?: PortfolioModuleDto['layout'],
+  ): Partial<EditorNodeLayout> {
+    const fallback = this.getDefaultLayout(type);
+    const columnStart = layout?.columnStart ?? fallback.columnStart;
+    const rowStart = layout?.rowStart ?? fallback.rowStart;
+    const columnSpan = layout?.columnSpan ?? fallback.columnSpan;
+    const rowSpan = layout?.rowSpan ?? fallback.rowSpan;
+
+    return {
+      columnStart: ((columnStart - 1) * LEGACY_COLUMN_SCALE) + 1,
+      rowStart: ((rowStart - 1) * LEGACY_ROW_SCALE) + 1,
+      columnSpan: columnSpan * LEGACY_COLUMN_SCALE,
+      rowSpan: rowSpan * LEGACY_ROW_SCALE,
+    };
+  }
+
+  private looksLikeLegacyLayout(modules: Array<PortfolioModuleDto & { type: ContentType }>) {
+    if (!modules.length) {
+      return false;
+    }
+
+    const maxColumnEnd = modules.reduce((currentMax, module) => {
+      const columnStart = module.layout?.columnStart ?? 1;
+      const columnSpan = module.layout?.columnSpan ?? 1;
+      return Math.max(currentMax, columnStart + columnSpan - 1);
+    }, 0);
+
+    return maxColumnEnd <= 12;
+  }
+
+  private createBackgroundNode(colorValue: string) {
+    return this.portfolioEditorStateService.createTreeNode('background', {
+      colorValue,
+      helperText: FREEFORM_LAYOUT_MARKER,
+      layout: {
+        columnStart: 1,
+        rowStart: 1,
+        columnSpan: CANVAS_COLUMNS,
+        rowSpan: 1,
+      },
+    });
+  }
+
+  private flattenModules(modules: PortfolioModuleDto[]): PortfolioModuleDto[] {
+    return modules.flatMap((module) => [module, ...this.flattenModules(module.children ?? [])]);
+  }
+
+  private isSupportedContentType(type: string): type is ContentType {
+    return (
+      type === 'title' ||
+      type === 'description' ||
+      type === 'image' ||
+      type === 'carousel' ||
+      type === 'table' ||
+      type === 'quote' ||
+      type === 'stats' ||
+      type === 'cta' ||
+      type === 'cv' ||
+      type === 'background'
+    );
+  }
+
+  private findNodeByKey(key: string) {
+    return this.treeNodes().find((node) => node.key === key) ?? null;
   }
 
   private refreshSelectedNode(key: string | null) {
@@ -570,206 +1212,9 @@ export class PortfolioEditorPage implements OnInit {
     this.portfolioEditorStateService.selectNodeByKey(key);
   }
 
-  private syncImportedCvAssetNodes(
-    sourceNode: TreeNode<EditorNodeData>,
-    images: string[],
-    tables: string[]
-  ) {
-    const sourceNodeKey = sourceNode.key ?? null;
-    const sourceLayout = sourceNode.data?.layout;
-    if (!sourceNodeKey || !sourceLayout) {
-      return;
-    }
-
-    const relation = this.findNodeRelation(this.treeNodes(), sourceNodeKey);
-    if (!relation) {
-      return;
-    }
-
-    const importPrefix = `${sourceNodeKey}:`;
-    const importedAssets = [
-      ...images.map((image, index) => ({
-        key: `${sourceNodeKey}:image:${index}`,
-        type: 'image' as const,
-        label: `Immagine CV ${index + 1}`,
-        images: [image],
-        textValue: ''
-      })),
-      ...tables.map((table, index) => ({
-        key: `${sourceNodeKey}:table:${index}`,
-        type: 'table' as const,
-        label: `Tabella CV ${index + 1}`,
-        images: [] as string[],
-        textValue: table
-      }))
-    ];
-
-    const existingImportedNodes = relation.nodes.filter((node) => {
-      const importKey = node.data?.importSourceKey;
-      return importKey === sourceNodeKey || importKey?.startsWith(importPrefix);
-    });
-    const existingImportedNodeMap = new Map(
-      existingImportedNodes
-        .filter((node): node is TreeNode<EditorNodeData> & { data: EditorNodeData } => Boolean(node.data))
-        .map((node) => [node.data.importSourceKey!, node])
-    );
-    const preservedNodes = relation.nodes.filter((node) => {
-      const importKey = node.data?.importSourceKey;
-      return !(importKey === sourceNodeKey || importKey?.startsWith(importPrefix));
-    });
-    const sourceIndex = preservedNodes.findIndex((node) => node.key === sourceNodeKey);
-    if (sourceIndex < 0) {
-      return;
-    }
-
-    const nextImportedNodes = importedAssets.map((asset, assetIndex) => {
-      const existingNode = existingImportedNodeMap.get(asset.key);
-      if (existingNode?.data) {
-        existingNode.label = asset.label;
-        existingNode.data.label = asset.label;
-        existingNode.data.images = [...asset.images];
-        existingNode.data.textValue = asset.textValue;
-        existingNode.data.importSourceKey = asset.key;
-        return existingNode;
-      }
-
-      const nextNode = this.portfolioEditorStateService.createTreeNode(asset.type);
-      nextNode.label = asset.label;
-      if (nextNode.data) {
-        nextNode.data.label = asset.label;
-        nextNode.data.images = [...asset.images];
-        nextNode.data.textValue = asset.textValue;
-        nextNode.data.importSourceKey = asset.key;
-        nextNode.data.layout = this.expandImportedAssetLayout(sourceLayout, asset.type, assetIndex);
-      }
-      return nextNode;
-    });
-
-    preservedNodes.splice(sourceIndex + 1, 0, ...nextImportedNodes);
-    relation.nodes.splice(0, relation.nodes.length, ...preservedNodes);
-  }
-
-  private ensureNodeFitsContent(node: TreeNode<EditorNodeData>) {
-    if (!node.data) {
-      return;
-    }
-
-    node.data.layout = this.expandLayoutForContent(
-      node.data.type,
-      node.data.textValue,
-      node.data.layout
-    );
-  }
-
-  private collectRenderableNodes(nodes: TreeNode<EditorNodeData>[]): TreeNode<EditorNodeData>[] {
-    return nodes.flatMap((node) =>
-      node.data?.type === 'background' ? this.collectRenderableNodes(node.children ?? []) : [node]
-    );
-  }
-
-  private findNodeByKey(nodes: TreeNode<EditorNodeData>[], key: string): TreeNode<EditorNodeData> | null {
-    for (const node of nodes) {
-      if (node.key === key) {
-        return node;
-      }
-
-      const childMatch = this.findNodeByKey(node.children ?? [], key);
-      if (childMatch) {
-        return childMatch;
-      }
-    }
-
-    return null;
-  }
-
-  private findNodeRelation(
-    nodes: TreeNode<EditorNodeData>[],
-    key: string
-  ): { nodes: TreeNode<EditorNodeData>[]; index: number } | null {
-    const directIndex = nodes.findIndex((node) => node.key === key);
-    if (directIndex >= 0) {
-      return { nodes, index: directIndex };
-    }
-
-    for (const node of nodes) {
-      const childRelation = this.findNodeRelation(node.children ?? [], key);
-      if (childRelation) {
-        return childRelation;
-      }
-    }
-
-    return null;
-  }
-
-  private normalizeLayout(type: ContentType, layout?: Partial<EditorNodeLayout> | null): EditorNodeLayout {
-    const fallback = this.portfolioEditorStateService.getDefaultLayout(type);
-    const minColumnSpan = type === 'title' ? 3 : type === 'background' ? GRID_COLUMNS : 2;
-    const minRowSpan = type === 'background' ? 1 : 2;
-    const columnSpan = this.clampInteger(layout?.columnSpan, minColumnSpan, GRID_COLUMNS, fallback.columnSpan);
-    const columnStart = this.clampInteger(
-      layout?.columnStart,
-      1,
-      GRID_COLUMNS - columnSpan + 1,
-      fallback.columnStart
-    );
-    const rowSpan = this.clampInteger(layout?.rowSpan, minRowSpan, MAX_GRID_ROW_SPAN, fallback.rowSpan);
-    const rowStart = this.clampInteger(layout?.rowStart, 1, 999, fallback.rowStart);
-
-    return {
-      columnStart,
-      rowStart,
-      columnSpan,
-      rowSpan
-    };
-  }
-
-  private expandImportedImageLayout(sourceLayout: EditorNodeLayout) {
-    const defaultImageLayout = this.portfolioEditorStateService.getDefaultLayout('image');
-    const sourceColumnEnd = sourceLayout.columnStart + sourceLayout.columnSpan - 1;
-    const remainingColumnsRight = GRID_COLUMNS - sourceColumnEnd;
-
-    if (remainingColumnsRight >= 3) {
-      return this.normalizeLayout('image', {
-        columnStart: sourceColumnEnd + 1,
-        rowStart: sourceLayout.rowStart,
-        columnSpan: Math.min(defaultImageLayout.columnSpan, remainingColumnsRight),
-        rowSpan: Math.max(defaultImageLayout.rowSpan, Math.min(sourceLayout.rowSpan, 12))
-      });
-    }
-
-    return this.normalizeLayout('image', {
-      columnStart: sourceLayout.columnStart,
-      rowStart: sourceLayout.rowStart + sourceLayout.rowSpan,
-      columnSpan: Math.min(defaultImageLayout.columnSpan, sourceLayout.columnSpan),
-      rowSpan: defaultImageLayout.rowSpan
-    });
-  }
-
-  private expandImportedTableLayout(sourceLayout: EditorNodeLayout) {
-    const defaultTableLayout = this.portfolioEditorStateService.getDefaultLayout('table');
-
-    return this.normalizeLayout('table', {
-      columnStart: sourceLayout.columnStart,
-      rowStart: sourceLayout.rowStart + sourceLayout.rowSpan + 1,
-      columnSpan: Math.max(defaultTableLayout.columnSpan, sourceLayout.columnSpan),
-      rowSpan: defaultTableLayout.rowSpan
-    });
-  }
-
-  private expandImportedAssetLayout(
-    sourceLayout: EditorNodeLayout,
-    type: 'image' | 'table',
-    assetIndex: number
-  ) {
-    const baseLayout =
-      type === 'image'
-        ? this.expandImportedImageLayout(sourceLayout)
-        : this.expandImportedTableLayout(sourceLayout);
-
-    return this.normalizeLayout(type, {
-      ...baseLayout,
-      rowStart: baseLayout.rowStart + assetIndex * (baseLayout.rowSpan + 1)
-    });
+  private readNumberInput(event: Event, fallback: number) {
+    const rawValue = Number.parseInt((event.target as HTMLInputElement).value, 10);
+    return Number.isFinite(rawValue) ? rawValue : fallback;
   }
 
   private clampInteger(value: number | undefined, min: number, max: number, fallback: number) {
@@ -779,80 +1224,39 @@ export class PortfolioEditorPage implements OnInit {
     return Math.min(max, Math.max(min, normalizedValue));
   }
 
-  private expandLayoutForContent(
-    type: ContentType,
-    textValue: string,
-    layout: EditorNodeLayout
-  ): EditorNodeLayout {
-    const requiredRowSpan = this.getRequiredRowSpan(type, textValue, layout.columnSpan);
-    if (requiredRowSpan <= layout.rowSpan) {
-      return layout;
+  private getTextJustify(textAlign: EditorNodeTextStyle['textAlign']) {
+    if (textAlign === 'center') {
+      return 'center';
     }
 
-    return {
-      ...layout,
-      rowSpan: requiredRowSpan
-    };
-  }
-
-  private getRequiredRowSpan(type: ContentType, textValue: string, columnSpan: number) {
-    switch (type) {
-      case 'cv':
-        return Math.min(
-          MAX_GRID_ROW_SPAN,
-          Math.max(8, 4 + Math.ceil(this.estimateWrappedLineCount(textValue, columnSpan, 9) / 2))
-        );
-      case 'description':
-        return Math.min(
-          MAX_GRID_ROW_SPAN,
-          Math.max(3, 2 + Math.ceil(this.estimateWrappedLineCount(textValue, columnSpan, 12) / 3))
-        );
-      case 'table':
-        return Math.min(
-          MAX_GRID_ROW_SPAN,
-          Math.max(4, 2 + this.parseTableRows(textValue).length * 2)
-        );
-      case 'title':
-        return Math.min(
-          MAX_GRID_ROW_SPAN,
-          Math.max(2, 1 + Math.ceil(this.estimateWrappedLineCount(textValue, columnSpan, 8) / 2))
-        );
-      default:
-        return 0;
-    }
-  }
-
-  private estimateWrappedLineCount(textValue: string, columnSpan: number, charsPerColumn: number) {
-    const normalizedText = textValue.trim();
-    if (!normalizedText) {
-      return 0;
+    if (textAlign === 'right') {
+      return 'end';
     }
 
-    const charactersPerLine = Math.max(18, Math.round(columnSpan * charsPerColumn));
-    return normalizedText.split('\n').reduce((lineCount, line) => {
-      const normalizedLineLength = Math.max(line.trim().length, 1);
-      return lineCount + Math.max(1, Math.ceil(normalizedLineLength / charactersPerLine));
-    }, 0);
+    return 'start';
   }
 
-  private parseTableRows(textValue: string) {
-    return textValue
-      .split('\n')
-      .map((row) => row.split('\t').map((cell) => cell.trim()))
-      .filter((row) => row.some((cell) => Boolean(cell)));
-  }
+  private getVerticalAlignValue(verticalAlign: EditorNodeTextStyle['verticalAlign']) {
+    if (verticalAlign === 'center') {
+      return 'center';
+    }
 
-  private isSupportedContentType(type: string): type is ContentType {
-    return this.contentOptions.some((option) => option.value === type);
+    if (verticalAlign === 'end') {
+      return 'end';
+    }
+
+    return 'start';
   }
 
   private slugify(value: string) {
     return value
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
+      .trim()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
   }
 
+  private canUseLocalStorage() {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  }
 }

@@ -448,7 +448,7 @@ export class PdfImportService {
 
     return rows
       .map((row) =>
-        Array.from({ length: columnCount }, (_value, index) => row[index]?.text.trim() ?? '').join('\t')
+        Array.from({ length: columnCount }, (_value, index) => row[index]?.text.trim() ?? '').join(';')
       )
       .join('\n')
       .trim();

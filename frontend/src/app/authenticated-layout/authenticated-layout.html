@@ -48,12 +48,22 @@
             <div class="editor-hierarchy-kicker">Editor</div>
             <strong>Gerarchia</strong>
             <span>{{ editorNodeCount() }} nodi</span>
+
+            @if (isGuidedLayout() && activeTemplate(); as layoutTemplate) {
+              <div class="editor-layout-pill">{{ layoutTemplate.name }}</div>
+            }
           </div>
 
           @if (editorTreeNodes().length === 0) {
             <div class="editor-hierarchy-empty">
               <strong>Struttura vuota</strong>
-              <p>Usa il pulsante `+` nell'editor per aggiungere il primo contenuto.</p>
+              <p>
+                @if (isGuidedLayout()) {
+                  Il layout guidato e' pronto, seleziona uno slot dalla preview o dalla gerarchia.
+                } @else {
+                  Usa il pulsante `+` nell'editor per aggiungere il primo contenuto.
+                }
+              </p>
             </div>
           } @else {
             <div class="editor-tree-shell">
@@ -62,8 +72,8 @@
                 selectionMode="single"
                 [selection]="selectedEditorTreeNode()"
                 (selectionChange)="onEditorSelectionChange($event)"
-                [draggableNodes]="true"
-                [droppableNodes]="true"
+                [draggableNodes]="!isGuidedLayout()"
+                [droppableNodes]="!isGuidedLayout()"
                 draggableScope="portfolio-editor"
                 droppableScope="portfolio-editor"
                 [filter]="true"

@@ -32,20 +32,13 @@
   backdrop-filter: blur(16px);
 }
 
-.side-nav.side-nav-editor {
-  align-content: center;
-}
-
 .side-nav-main {
   min-height: 0;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   align-content: start;
   gap: 1rem;
   overflow: hidden;
-}
-
-.side-nav.side-nav-editor .side-nav-main {
-  align-content: center;
 }
 
 .profile-link {
@@ -161,6 +154,7 @@
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  align-self: stretch;
   gap: 0.85rem;
   padding: 0.8rem;
   border-radius: 1.3rem;
@@ -183,6 +177,16 @@
   font-size: 0.7rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+.editor-layout-pill {
+  display: inline-flex;
+  justify-self: start;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #effef8;
+  font-size: 0.76rem;
 }
 
 .editor-hierarchy-empty {

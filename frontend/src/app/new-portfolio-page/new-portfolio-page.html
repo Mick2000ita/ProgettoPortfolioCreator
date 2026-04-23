@@ -3,10 +3,11 @@
     <div class="eyebrow">Step 1</div>
     <h1>Imposta il setup iniziale del tuo portfolio.</h1>
     <p>
-      Questo step serve a definire nome, URL e contenuti iniziali. Dopo la creazione entrerai in
-      un editor dedicato per continuare a costruire il portfolio.
-      L'URL finale conterra' solo il nome scelto, ad esempio
-      <code>/{{ slugPreview() || 'nome-portfolio' }}</code>.
+      In questo step scegli nome, URL e il layout di partenza. Dopo la creazione entrerai in un
+      editor guidato: potrai caricare immagini, scrivere testi e compilare solo le sezioni previste
+      dal layout selezionato. L'URL finale conterra' solo il nome scelto, ad esempio
+      <code>/{{ slugPreview() || 'nome-portfolio' }}</code
+      >.
     </p>
 
     <form class="portfolio-form" [formGroup]="portfolioForm" (ngSubmit)="submit()">
@@ -27,140 +28,124 @@
       <div class="form-section">
         <div class="section-head">
           <div>
-            <h2>2. Aggiungi contenuto</h2>
+            <h2>2. Scegli un layout</h2>
             <p class="section-copy">
-              Puoi aggiungere piu' blocchi dello stesso tipo invece di scegliere moduli fissi.
+              Puoi partire da un layout guidato oppure continuare senza layout per aprire l'editor
+              normale e costruire il portfolio liberamente.
             </p>
           </div>
 
-          <div class="add-row">
-            <select
-              class="content-select"
-              [value]="selectedContentType()"
-              (change)="setSelectedContentType($any($event.target).value)"
-            >
-              @for (option of contentOptions; track option.value) {
-                <option [value]="option.value">{{ option.label }}</option>
-              }
-            </select>
+          @if (selectedLayout(); as activeLayout) {
+            <div class="selected-layout-chip">
+              <span>Layout attivo</span>
+              <strong>{{ activeLayout.name }}</strong>
+            </div>
+          } @else {
+            <div class="selected-layout-chip">
+              <span>Modalita' attiva</span>
+              <strong>Editor libero</strong>
+            </div>
+          }
+        </div>
 
-            <p-button
+        <div class="layout-grid">
+          <button
+            type="button"
+            class="layout-card layout-card-free"
+            [class.layout-card-active]="selectedLayoutId() === null"
+            (click)="continueWithoutLayout()"
+          >
+            <div class="layout-card-head">
+              <span class="layout-card-kicker">Libero</span>
+              <strong>Nessun layout</strong>
+            </div>
+
+            <p>
+              Entra nell'editor normale con canvas vuoto, aggiungi moduli, spostali e costruisci la
+              pagina senza vincoli iniziali.
+            </p>
+
+            <div class="layout-preview-copy">Editor standard con blocchi liberi</div>
+
+            <div class="layout-miniature layout-miniature-free">
+              <span class="layout-miniature-slot layout-miniature-slot-wide"></span>
+              <span class="layout-miniature-slot"></span>
+              <span class="layout-miniature-slot"></span>
+              <span class="layout-miniature-slot layout-miniature-slot-tall"></span>
+              <span class="layout-miniature-slot"></span>
+            </div>
+          </button>
+
+          @for (layout of layoutTemplates; track trackTemplate($index)) {
+            <button
               type="button"
-              label="Aggiungi contenuto"
-              icon="pi pi-plus"
-              (onClick)="addSelectedContent()"
-            />
-          </div>
+              class="layout-card"
+              [class.layout-card-active]="selectedLayoutId() === layout.id"
+              [style.--layout-accent]="layout.accent"
+              (click)="selectLayout(layout.id)"
+            >
+              <div class="layout-card-head">
+                <span class="layout-card-kicker">Layout</span>
+                <strong>{{ layout.name }}</strong>
+              </div>
+
+              <p>{{ layout.description }}</p>
+
+              <div class="layout-preview-copy">{{ layout.preview }}</div>
+
+              <div class="layout-miniature">
+                @for (slot of layout.slots; track slot.id) {
+                  <span
+                    class="layout-miniature-slot"
+                    [style.grid-column]="
+                      slot.layout.columnStart + ' / span ' + slot.layout.columnSpan
+                    "
+                    [style.grid-row]="slot.layout.rowStart + ' / span ' + slot.layout.rowSpan"
+                  ></span>
+                }
+              </div>
+            </button>
+          }
         </div>
       </div>
 
-      <div class="contents-stack" formArrayName="contents">
-        @if (contentsArray.length === 0) {
-          <section class="form-section empty-content-state">
-            <strong>Nessun contenuto aggiunto.</strong>
-            <p>Seleziona un tipo di contenuto e premi “Aggiungi contenuto” per iniziare.</p>
-          </section>
-        }
-
-        @for (content of contentsArray.controls; track trackContent($index, content); let index = $index) {
-          <section class="form-section content-section" [formGroupName]="index">
-            <div class="content-head">
-              <div>
-                <span class="content-type">{{ getContentTypeLabel(content.controls.type.value) }}</span>
-                <h3>{{ content.controls.label.value }}</h3>
-              </div>
-
-              <button type="button" class="remove-button" (click)="removeContent(index)">
-                Rimuovi
-              </button>
+      @if (selectedLayout(); as activeLayout) {
+        <section class="form-section layout-summary">
+          <div class="summary-head">
+            <div>
+              <span class="content-type">Preview editor</span>
+              <h3>{{ activeLayout.name }}</h3>
             </div>
+            <div class="summary-accent" [style.background]="activeLayout.accent"></div>
+          </div>
 
-            @if (isType(content, 'title')) {
-              <label class="field-block">
-                <span>Titolo</span>
-                <input pInputText formControlName="textValue" placeholder="Titolo principale" />
-              </label>
+          <p>{{ activeLayout.description }}</p>
+
+          <div class="summary-slots">
+            @for (slot of activeLayout.slots; track slot.id) {
+              <article class="summary-slot">
+                <strong>{{ slot.label }}</strong>
+                <span>{{ slot.helperText }}</span>
+              </article>
             }
+          </div>
+        </section>
+      } @else {
+        <section class="form-section layout-summary">
+          <div class="summary-head">
+            <div>
+              <span class="content-type">Preview editor</span>
+              <h3>Editor libero</h3>
+            </div>
+            <div class="summary-accent summary-accent-free"></div>
+          </div>
 
-            @if (isType(content, 'description')) {
-              <label class="field-block">
-                <span>Descrizione</span>
-                <textarea
-                  pTextarea
-                  formControlName="textValue"
-                  rows="4"
-                  placeholder="Descrizione del portfolio"
-                ></textarea>
-              </label>
-            }
-
-            @if (isType(content, 'background')) {
-              <label class="field-block">
-                <span>Background</span>
-                <input type="color" class="color-input" formControlName="colorValue" />
-              </label>
-            }
-
-            @if (isType(content, 'cv')) {
-              <label class="field-block">
-                <span>CV (PDF)</span>
-                <input type="file" accept="application/pdf" (change)="onCvSelected(index, $event)" />
-                @if (content.controls.fileName.value) {
-                  <small>{{ content.controls.fileName.value }}</small>
-                }
-              </label>
-
-              @if (isExtractingCv()) {
-                <div class="helper-box">
-                  Sto importando il CV, ricostruisco il testo con la formattazione e aggiungo anche le
-                  immagini e le tabelle tra i contenuti selezionabili.
-                </div>
-              }
-
-              @if (extractionError()) {
-                <div class="helper-box helper-box-error">{{ extractionError() }}</div>
-              }
-
-              <label class="field-block">
-                <span>Testo estratto dal CV</span>
-                <textarea
-                  pTextarea
-                  formControlName="textValue"
-                  rows="10"
-                  placeholder="Il testo del CV apparira' qui con la formattazione ricostruita e potra' essere modificato."
-                ></textarea>
-              </label>
-            }
-
-            @if (isType(content, 'image')) {
-              <label class="field-block">
-                <span>Immagini</span>
-                <input type="file" accept="image/*" multiple (change)="onImagesSelected(index, $event)" />
-              </label>
-
-              @if (content.controls.images.value.length > 0) {
-                <div class="preview-grid">
-                  @for (image of content.controls.images.value; track image) {
-                    <img [src]="image" alt="Anteprima immagine" />
-                  }
-                </div>
-              }
-            }
-
-            @if (isType(content, 'table')) {
-              <label class="field-block">
-                <span>Tabella</span>
-                <textarea
-                  pTextarea
-                  formControlName="textValue"
-                  rows="8"
-                  placeholder="Una riga per record, celle separate da tab"
-                ></textarea>
-              </label>
-            }
-          </section>
-        }
-      </div>
+          <p>
+            Il portfolio verra' creato vuoto e si aprira' l'editor normale. Potrai aggiungere nuovi
+            blocchi, spostarli, ridimensionarli e costruire la struttura da zero.
+          </p>
+        </section>
+      }
 
       <div class="actions-row">
         <a routerLink="/portfolios" class="back-link">
@@ -169,7 +154,7 @@
 
         <p-button
           type="submit"
-          label="Crea e apri editor"
+          label="Crea portfolio"
           icon="pi pi-arrow-right"
           [loading]="isSubmitting()"
         />

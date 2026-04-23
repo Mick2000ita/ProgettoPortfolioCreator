@@ -1,358 +1,570 @@
 <div class="editor-stage" [style.--editor-page-bg]="backgroundColor()">
-  <div class="editor-layout">
-    <div class="preview-layer" [style.background]="backgroundColor()">
-      <div class="preview-backdrop"></div>
-
-      <section class="preview-canvas">
-        <div class="preview-header">
-          <div class="preview-eyebrow">Preview</div>
-          <h1>{{ portfolioForm.controls.title.value || 'Portfolio senza titolo' }}</h1>
-          <span>/{{ slugPreview() || 'nome-portfolio' }}</span>
-        </div>
-
+  <div class="editor-shell">
+    <div class="workspace-grid">
+      <section class="canvas-panel">
         @if (isLoadingPortfolio()) {
-          <div class="preview-empty">
+          <section class="canvas-state">
             <strong>Sto caricando il portfolio...</strong>
-            <p>La preview comparira' non appena la struttura sara' pronta.</p>
-          </div>
+            <p>Tra poco trovi qui il canvas completo.</p>
+          </section>
         } @else if (loadError()) {
-          <div class="preview-empty preview-empty-error">
+          <section class="canvas-state canvas-state-error">
             <strong>Impossibile aprire l'editor.</strong>
             <p>{{ loadError() }}</p>
-          </div>
-        } @else if (!hasPreviewContent()) {
-          <div class="preview-empty">
-            <strong>Nessun blocco in scena.</strong>
-            <p>Usa il pulsante `+` nella toolbar per iniziare e organizza i blocchi dalla sidebar.</p>
-          </div>
+          </section>
         } @else {
-          <div class="preview-stack preview-grid">
-            @for (node of previewNodes(); track trackNode($index, node)) {
-              <ng-container
-                [ngTemplateOutlet]="previewNode"
-                [ngTemplateOutletContext]="{ $implicit: node, depth: 0 }"
-              />
-            }
+          <div class="canvas-frame" [style.background]="backgroundColor()">
+            <section
+              #canvasSurface
+              class="canvas-surface"
+              [style.--canvas-rows]="canvasRowCount()"
+              (pointerdown)="onCanvasPointerDown($event)"
+            >
+              @if (dragPreviewLayout(); as previewLayout) {
+                <div
+                  class="drop-indicator"
+                  [style.grid-column]="previewLayout.columnStart + ' / span ' + previewLayout.columnSpan"
+                  [style.grid-row]="previewLayout.rowStart + ' / span ' + previewLayout.rowSpan"
+                ></div>
+              }
+
+              @if (!pageNodes().length) {
+                <div class="canvas-empty">
+                  <strong>Canvas vuoto.</strong>
+                  <p>
+                    Trascina moduli moderni come titolo, immagine, carousel, quote, stats, CTA,
+                    tabella o CV dalla toolbar in basso.
+                  </p>
+                </div>
+              }
+
+              @for (node of pageNodes(); track trackNode($index, node)) {
+                @if (node.data; as nodeData) {
+                  <article
+                    class="canvas-item"
+                    [class.canvas-item-selected]="isSelectedNode(node)"
+                    [class.canvas-item-title]="nodeData.type === 'title'"
+                    [class.canvas-item-description]="nodeData.type === 'description'"
+                    [class.canvas-item-image]="nodeData.type === 'image'"
+                    [class.canvas-item-carousel]="nodeData.type === 'carousel'"
+                    [class.canvas-item-table]="nodeData.type === 'table'"
+                    [class.canvas-item-quote]="nodeData.type === 'quote'"
+                    [class.canvas-item-stats]="nodeData.type === 'stats'"
+                    [class.canvas-item-cta]="nodeData.type === 'cta'"
+                    [class.canvas-item-cv]="nodeData.type === 'cv'"
+                    [style.grid-column]="getCanvasItemStyle(node).gridColumn"
+                    [style.grid-row]="getCanvasItemStyle(node).gridRow"
+                    (click)="selectNode(node, $event)"
+                  >
+                    <div class="canvas-card">
+                      <header class="canvas-item-header">
+                        <div class="canvas-item-label">
+                          @if (!isSelectedNode(node)) {
+                            <span class="canvas-item-tag">{{ getContentTypeLabel(nodeData.type) }}</span>
+                          }
+                          @if (!isSelectedNode(node)) {
+                            <strong>{{ nodeData.label }}</strong>
+                          }
+                        </div>
+
+                        <button
+                          type="button"
+                          class="block-grab"
+                          (pointerdown)="startNodeMove($event, node)"
+                        >
+                          <i class="pi pi-arrows-alt"></i>
+                        </button>
+                      </header>
+
+                      <div class="canvas-item-body">
+                        @if (nodeData.type === 'title') {
+                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
+                            <input
+                              pInputText
+                              class="inline-block-input inline-block-title"
+                              [value]="nodeData.textValue"
+                              placeholder="Titolo portfolio"
+                              (pointerdown)="selectNode(node, $event)"
+                              (input)="updateNodeText(node, $event)"
+                            />
+                          </div>
+                        }
+
+                        @if (nodeData.type === 'description') {
+                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
+                            <textarea
+                              pTextarea
+                              class="inline-block-textarea"
+                              rows="5"
+                              [value]="nodeData.textValue"
+                              placeholder="Aggiungi qui un testo introduttivo o descrittivo."
+                              (pointerdown)="selectNode(node, $event)"
+                              (input)="updateNodeText(node, $event)"
+                            ></textarea>
+                          </div>
+                        }
+
+                        @if (nodeData.type === 'image') {
+                          @if (getPrimaryImage(nodeData.images); as image) {
+                            <div class="single-image-preview">
+                              <img [src]="image" alt="Anteprima immagine" />
+                            </div>
+                          } @else {
+                            <div class="block-placeholder">
+                              Box immagine singola pronto a ricevere cover, mockup o visual hero.
+                            </div>
+                          }
+                        }
+
+                        @if (nodeData.type === 'carousel') {
+                          @if (nodeData.images.length > 0) {
+                            <div class="carousel-preview-card">
+                              <div class="carousel-preview-media">
+                                <img [src]="nodeData.images[0]" alt="Anteprima carousel" />
+                                @if (nodeData.images.length > 1) {
+                                  <div class="carousel-editor-dots">
+                                    @for (image of nodeData.images; track image; let slideIndex = $index) {
+                                      <span [class.carousel-editor-dot-active]="slideIndex === 0"></span>
+                                    }
+                                  </div>
+                                }
+                              </div>
+                              <div class="carousel-preview-meta">
+                                <span>{{ nodeData.images.length }} slide</span>
+                                <small>Carousel sfogliabile nella pagina pubblica</small>
+                              </div>
+                            </div>
+                          } @else {
+                            <div class="block-placeholder">
+                              Carousel vuoto. Carica almeno due immagini per creare una sequenza.
+                            </div>
+                          }
+                        }
+
+                        @if (nodeData.type === 'table') {
+                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
+                            <div class="inline-helper">Una riga per record, celle separate da `;`.</div>
+                            <textarea
+                              pTextarea
+                              class="inline-block-textarea"
+                              rows="6"
+                              [value]="nodeData.textValue"
+                              placeholder="Servizio;Branding;2026"
+                              (pointerdown)="selectNode(node, $event)"
+                              (input)="updateNodeText(node, $event)"
+                            ></textarea>
+                          </div>
+                        }
+
+                        @if (nodeData.type === 'quote') {
+                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
+                            <textarea
+                              pTextarea
+                              class="inline-block-textarea inline-block-quote"
+                              rows="4"
+                              [value]="nodeData.textValue"
+                              placeholder="Aggiungi una quote che dia tono al portfolio."
+                              (pointerdown)="selectNode(node, $event)"
+                              (input)="updateNodeText(node, $event)"
+                            ></textarea>
+                            <input
+                              pInputText
+                              class="inline-block-input inline-block-subtle"
+                              [value]="nodeData.subtitle"
+                              placeholder="Autore o ruolo"
+                              (pointerdown)="selectNode(node, $event)"
+                              (input)="updateNodeSubtitle(node, $event)"
+                            />
+                          </div>
+                        }
+
+                        @if (nodeData.type === 'stats') {
+                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
+                            <div class="inline-helper">Formato consigliato: `Valore;Etichetta;Dettaglio`.</div>
+                            <textarea
+                              pTextarea
+                              class="inline-block-textarea"
+                              rows="6"
+                              [value]="nodeData.textValue"
+                              placeholder="48%;Conversion uplift;Q1 2026"
+                              (pointerdown)="selectNode(node, $event)"
+                              (input)="updateNodeText(node, $event)"
+                            ></textarea>
+                          </div>
+                        }
+
+                        @if (nodeData.type === 'cta') {
+                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
+                            <textarea
+                              pTextarea
+                              class="inline-block-textarea"
+                              rows="4"
+                              [value]="nodeData.textValue"
+                              placeholder="Aggiungi una call to action per contatti, candidature o approfondimenti."
+                              (pointerdown)="selectNode(node, $event)"
+                              (input)="updateNodeText(node, $event)"
+                            ></textarea>
+                            <input
+                              pInputText
+                              class="inline-block-input"
+                              [value]="nodeData.buttonLabel"
+                              placeholder="Label bottone"
+                              (pointerdown)="selectNode(node, $event)"
+                              (input)="updateNodeButtonLabel(node, $event)"
+                            />
+                            <input
+                              pInputText
+                              class="inline-block-input inline-block-subtle"
+                              [value]="nodeData.url"
+                              placeholder="https://... oppure mailto:..."
+                              (pointerdown)="selectNode(node, $event)"
+                              (input)="updateNodeUrl(node, $event)"
+                            />
+                          </div>
+                        }
+
+                        @if (nodeData.type === 'cv') {
+                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
+                            <div class="inline-file-row">
+                              <label class="inline-upload-chip" (pointerdown)="selectNode(node, $event)">
+                                <input
+                                  type="file"
+                                  accept="application/pdf"
+                                  (change)="onCvSelectedForNode(node, $event)"
+                                />
+                                <span>{{ nodeData.fileName ? 'Sostituisci PDF' : 'Carica PDF' }}</span>
+                              </label>
+                              <small>{{ nodeData.fileName || 'Curriculum non caricato' }}</small>
+                            </div>
+
+                            @if (isExtractingCv() && isSelectedNode(node)) {
+                              <div class="inline-helper">Sto estraendo il testo del PDF.</div>
+                            }
+
+                            @if (extractionError() && isSelectedNode(node)) {
+                              <div class="inline-helper inline-helper-error">{{ extractionError() }}</div>
+                            }
+
+                            <textarea
+                              pTextarea
+                              class="inline-block-textarea inline-block-cv"
+                              rows="8"
+                              [value]="nodeData.textValue"
+                              placeholder="Il testo estratto del CV comparira qui."
+                              (pointerdown)="selectNode(node, $event)"
+                              (input)="updateNodeText(node, $event)"
+                            ></textarea>
+                          </div>
+                        }
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      class="corner-resize-handle corner-resize-handle-top-left"
+                      (pointerdown)="startNodeResizeFromCorner($event, node, 'top-left')"
+                    ></button>
+                    <button
+                      type="button"
+                      class="corner-resize-handle corner-resize-handle-top-right"
+                      (pointerdown)="startNodeResizeFromCorner($event, node, 'top-right')"
+                    ></button>
+                    <button
+                      type="button"
+                      class="corner-resize-handle corner-resize-handle-bottom-left"
+                      (pointerdown)="startNodeResizeFromCorner($event, node, 'bottom-left')"
+                    ></button>
+                    <button
+                      type="button"
+                      class="corner-resize-handle corner-resize-handle-bottom-right"
+                      (pointerdown)="startNodeResizeFromCorner($event, node, 'bottom-right')"
+                    ></button>
+                  </article>
+                }
+              }
+            </section>
           </div>
         }
       </section>
-    </div>
 
-    <aside class="floating-panel inspector-panel">
-      <div class="portfolio-settings" [formGroup]="portfolioForm">
-        <div class="panel-kicker">Portfolio</div>
+      <aside class="inspector-panel">
+        <section class="panel-card">
+          <div class="panel-kicker">Portfolio</div>
 
-        <label class="field-block">
-          <span>Nome portfolio</span>
-          <input pInputText formControlName="title" placeholder="Es. marco-rinaldi" />
-        </label>
-
-        <div class="slug-pill">/{{ slugPreview() || 'nome-portfolio' }}</div>
-      </div>
-
-      <div class="panel-head">
-        <div>
-          <div class="panel-kicker">Inspector</div>
-          <h2>Elemento selezionato</h2>
-        </div>
-
-        @if (canRemoveSelectedNode() && selectedNodeData) {
-          <button type="button" class="panel-remove" (click)="removeSelectedNode()">Rimuovi</button>
-        }
-      </div>
-
-      @if (selectedNodeData; as selectedNode) {
-        <div class="selected-chip">
-          <i [class]="selectedTreeNode?.icon"></i>
-          <span>{{ selectedNode.label }}</span>
-        </div>
-
-        <div class="node-summary">
-          <span>{{ selectedNodeChildren.length }} figli diretti</span>
-          <span>Tipo: {{ getContentTypeLabel(selectedNode.type) }}</span>
-        </div>
-
-        <div class="inspector-form" [formGroup]="nodeEditorForm">
-          @if (selectedNodeType === 'title') {
+          <div [formGroup]="portfolioForm">
             <label class="field-block">
-              <span>Titolo</span>
-              <input pInputText formControlName="textValue" placeholder="Titolo principale" />
+              <span>Titolo portfolio</span>
+              <input
+                pInputText
+                formControlName="title"
+                placeholder="Es. Marco Rinaldi Portfolio"
+              />
             </label>
-          }
+          </div>
 
-          @if (selectedNodeType === 'description') {
-            <label class="field-block">
-              <span>Descrizione</span>
-              <textarea
-                pTextarea
-                formControlName="textValue"
-                rows="8"
-                placeholder="Descrizione del blocco selezionato"
-              ></textarea>
-            </label>
-          }
+          <div class="slug-pill">/{{ slugPreview() || 'nome-portfolio' }}</div>
 
-          @if (selectedNodeType === 'table') {
-            <label class="field-block">
-              <span>Tabella</span>
-              <textarea
-                pTextarea
-                formControlName="textValue"
-                rows="10"
-                placeholder="Una riga per record, celle separate da tab"
-              ></textarea>
-            </label>
-          }
+          <label class="field-block">
+            <span>Colore pagina</span>
+            <input
+              type="color"
+              class="color-input"
+              [value]="backgroundColor()"
+              (input)="updateBackgroundColor($event)"
+            />
+          </label>
+        </section>
 
-          @if (selectedNodeType === 'background') {
-            <label class="field-block">
-              <span>Colore background</span>
-              <input type="color" class="color-input" formControlName="colorValue" />
-            </label>
-          }
-
-          @if (selectedNodeType === 'cv') {
-            <label class="field-block">
-              <span>CV (PDF)</span>
-              <input type="file" accept="application/pdf" (change)="onCvSelected($event)" />
-              @if (selectedNode.fileName) {
-                <small>{{ selectedNode.fileName }}</small>
-              }
-            </label>
-
-            @if (isExtractingCv()) {
-              <div class="helper-box">
-                Sto ricostruendo il testo del PDF mantenendo la formattazione e preparo anche le immagini
-                e le tabelle come elementi selezionabili.
+        @if (selectedNodeData(); as selectedNode) {
+          <section class="panel-card">
+            <div class="panel-head">
+              <div>
+                <div class="panel-kicker">Elemento</div>
+                <h2>{{ getContentTypeLabel(selectedNode.type) }}</h2>
               </div>
-            }
 
-            @if (extractionError()) {
-              <div class="helper-box helper-box-error">{{ extractionError() }}</div>
-            }
+              <button
+                type="button"
+                class="remove-button"
+                [disabled]="!canRemoveSelectedNode()"
+                (click)="removeSelectedNode()"
+              >
+                Rimuovi
+              </button>
+            </div>
 
-            <label class="field-block">
-              <span>Testo CV</span>
-              <textarea
-                pTextarea
-                formControlName="textValue"
-                rows="12"
-                placeholder="Testo estratto dal CV con la formattazione ricostruita"
-              ></textarea>
-            </label>
-          }
+            @if (selectedNode.type === 'image') {
+              <label class="field-block">
+                <span>Carica immagine</span>
+                <input type="file" accept="image/*" (change)="onImagesSelected($event)" />
+              </label>
 
-          @if (selectedNodeType === 'image') {
-            <label class="field-block">
-              <span>Immagini</span>
-              <input type="file" accept="image/*" multiple (change)="onImagesSelected($event)" />
-            </label>
-
-            @if (selectedNode.images.length > 0) {
-              <div class="image-grid">
-                @for (image of selectedNode.images; track image; let imageIndex = $index) {
-                  <figure class="image-card">
-                    <img [src]="image" alt="Anteprima immagine" />
-                    <button type="button" class="image-remove" (click)="removeImage(imageIndex)">
-                      Rimuovi
-                    </button>
+              @if (getPrimaryImage(selectedNode.images); as image) {
+                <div class="inspector-image-grid">
+                  <figure class="inspector-image-card">
+                    <figcaption>Preview</figcaption>
+                    <img [src]="image" alt="Preview immagine editor" />
+                    <button type="button" (click)="removeImage(0)">Rimuovi</button>
                   </figure>
-                }
-              </div>
-            } @else {
-              <div class="panel-empty panel-empty-soft">
-                <p>Nessuna immagine caricata per questo nodo.</p>
-              </div>
+                </div>
+              } @else {
+                <div class="helper-box">
+                  Nessuna immagine caricata. Quando ne aggiungi una, la preview compare qui e nel canvas.
+                </div>
+              }
             }
-          }
-        </div>
-      } @else {
-        <div class="panel-empty">
-          <strong>Nessun elemento selezionato</strong>
-          <p>Seleziona un nodo nella sidebar o nella preview per modificarlo, spostarlo o ridimensionarlo.</p>
-        </div>
-      }
-    </aside>
+
+            @if (selectedNode.type === 'carousel') {
+              <label class="field-block">
+                <span>Carica slide</span>
+                <input type="file" accept="image/*" multiple (change)="onImagesSelected($event)" />
+              </label>
+
+              @if (selectedNode.images.length > 0) {
+                <div class="helper-box">
+                  {{ selectedNode.images.length }} slide nel carousel.
+                </div>
+
+                <div class="inspector-image-grid">
+                  @for (image of selectedNode.images; track image; let imageIndex = $index) {
+                    <figure class="inspector-image-card">
+                      <figcaption>Slide {{ $index + 1 }}</figcaption>
+                      <img [src]="image" alt="Preview slide carousel" />
+                      <button type="button" (click)="removeImage(imageIndex)">Rimuovi</button>
+                    </figure>
+                  }
+                </div>
+              } @else {
+                <div class="helper-box">
+                  Nessuna slide caricata. Aggiungi immagini per vedere l anteprima del carousel.
+                </div>
+              }
+            }
+
+            @if (supportsTextFormatting(selectedNode.type)) {
+              <div class="helper-box">
+                Modifica il contenuto direttamente nel blocco sul canvas. Qui trovi solo i controlli di stile.
+              </div>
+
+              <section class="format-panel">
+                <div class="field-block">
+                  <span>Formattazione testo</span>
+                </div>
+
+                <div class="field-grid">
+                  <label class="field-block">
+                    <span>Dimensione</span>
+                    <input
+                      type="number"
+                      min="12"
+                      max="120"
+                      [value]="getResolvedTextStyle(selectedNode).fontSize"
+                      (input)="updateSelectedTextSize($event)"
+                    />
+                  </label>
+
+                  <label class="field-block">
+                    <span>Colore</span>
+                    <input
+                      type="color"
+                      class="color-input"
+                      [value]="getResolvedTextStyle(selectedNode).textColor || '#161815'"
+                      (input)="updateSelectedTextColor($event)"
+                    />
+                  </label>
+                </div>
+
+                <div class="field-block">
+                  <span>Allineamento orizzontale</span>
+                  <div class="format-toggle-row">
+                    <button
+                      type="button"
+                      class="format-toggle"
+                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).textAlign === 'left'"
+                      (click)="updateSelectedTextAlign('left')"
+                    >
+                      Sinistra
+                    </button>
+                    <button
+                      type="button"
+                      class="format-toggle"
+                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).textAlign === 'center'"
+                      (click)="updateSelectedTextAlign('center')"
+                    >
+                      Centro
+                    </button>
+                    <button
+                      type="button"
+                      class="format-toggle"
+                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).textAlign === 'right'"
+                      (click)="updateSelectedTextAlign('right')"
+                    >
+                      Destra
+                    </button>
+                  </div>
+                </div>
+
+                <div class="field-block">
+                  <span>Allineamento verticale</span>
+                  <div class="format-toggle-row">
+                    <button
+                      type="button"
+                      class="format-toggle"
+                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).verticalAlign === 'start'"
+                      (click)="updateSelectedVerticalAlign('start')"
+                    >
+                      Alto
+                    </button>
+                    <button
+                      type="button"
+                      class="format-toggle"
+                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).verticalAlign === 'center'"
+                      (click)="updateSelectedVerticalAlign('center')"
+                    >
+                      Centro
+                    </button>
+                    <button
+                      type="button"
+                      class="format-toggle"
+                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).verticalAlign === 'end'"
+                      (click)="updateSelectedVerticalAlign('end')"
+                    >
+                      Basso
+                    </button>
+                  </div>
+                </div>
+
+                <div class="field-block">
+                  <span>Stile</span>
+                  <div class="format-toggle-row">
+                    <button
+                      type="button"
+                      class="format-toggle"
+                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).bold"
+                      (click)="toggleSelectedBold()"
+                    >
+                      Grassetto
+                    </button>
+                    <button
+                      type="button"
+                      class="format-toggle"
+                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).italic"
+                      (click)="toggleSelectedItalic()"
+                    >
+                      Corsivo
+                    </button>
+                  </div>
+                </div>
+              </section>
+            }
+          </section>
+        } @else {
+          <section class="panel-card panel-card-soft">
+            <div class="panel-kicker">Inspector</div>
+            <strong>Nessun blocco selezionato.</strong>
+            <p>Seleziona un elemento nel canvas per formattarlo o gestire i caricamenti media.</p>
+          </section>
+        }
+      </aside>
+    </div>
   </div>
 
   <div class="bottom-toolbar">
-    <a routerLink="/portfolios" class="toolbar-link">
-      <button pButton type="button" class="toolbar-button" icon="pi pi-arrow-left"></button>
+    <a routerLink="/portfolios" class="toolbar-action toolbar-action-link">
+      <i class="pi pi-arrow-left"></i>
+      <span>Indietro</span>
     </a>
 
     <button
-      pButton
       type="button"
-      class="toolbar-button"
-      icon="pi pi-trash"
-      [disabled]="!selectedNodeData || !canRemoveSelectedNode()"
+      class="toolbar-action"
+      [disabled]="!canRemoveSelectedNode()"
       (click)="removeSelectedNode()"
-    ></button>
+    >
+      <i class="pi pi-trash"></i>
+      <span>Elimina</span>
+    </button>
+
+    <div class="toolbar-tools">
+      @for (option of toolbarTools; track option.value) {
+        <button
+          type="button"
+          class="tool-chip"
+          [class.tool-chip-active]="isDraggingTool(option.value)"
+          (click)="addNodeFromToolbar(option.value)"
+          (pointerdown)="startToolbarDrag($event, option.value)"
+        >
+          <i [class]="option.icon"></i>
+          <span>{{ option.label }}</span>
+        </button>
+      }
+    </div>
+
+    <button type="button" class="toolbar-action" (click)="openLivePortfolio()">
+      <i class="pi pi-external-link"></i>
+      <span>Apri</span>
+    </button>
 
     <button
-      pButton
       type="button"
-      class="toolbar-button toolbar-button-primary"
-      icon="pi pi-plus"
-      (click)="addNodeMenu.toggle($event)"
-    ></button>
-
-    <button
-      pButton
-      type="button"
-      class="toolbar-button"
-      icon="pi pi-external-link"
-      (click)="openLivePortfolio()"
-    ></button>
-
-    <button
-      pButton
-      type="button"
-      class="toolbar-button"
-      icon="pi pi-check"
-      [loading]="isSubmitting()"
+      class="toolbar-action toolbar-action-primary"
+      [disabled]="isSubmitting()"
       (click)="submit()"
-    ></button>
+    >
+      <i class="pi pi-check"></i>
+      <span>{{ isSubmitting() ? 'Salvataggio...' : 'Salva' }}</span>
+    </button>
   </div>
 
-  <p-popover #addNodeMenu styleClass="add-node-popover">
-    <div class="add-node-menu">
-      <div class="add-node-copy">
-        <strong>Aggiungi elemento</strong>
-        <p>
-          @if (selectedNodeData) {
-            Il nuovo blocco verra' inserito dentro il nodo selezionato.
-          } @else {
-            Il nuovo blocco verra' inserito al livello radice.
-          }
-        </p>
-      </div>
-
-      <div class="add-node-options">
-        @for (option of addableContentOptions; track option.value) {
-          <button type="button" class="add-node-option" (click)="addNode(option.value, addNodeMenu)">
-            <i [class]="option.icon"></i>
-            <span>{{ option.label }}</span>
-            <small>{{ option.description }}</small>
-          </button>
-        }
-      </div>
-    </div>
-  </p-popover>
-</div>
-
-<ng-template #previewNode let-node let-depth="depth">
-  @if (node.data; as nodeData) {
-    <section
-      class="preview-node-shell"
-      [class.preview-node-selected]="isSelectedPreviewNode(node)"
-      [style.grid-column]="previewNodeStyle(node).gridColumn"
-      [style.grid-row]="previewNodeStyle(node).gridRow"
-      (click)="selectPreviewNode(node, $event)"
+  @if (dragGhost(); as ghost) {
+    <div
+      class="drag-ghost"
+      [class.drag-ghost-active]="ghost.active"
+      [style.left.px]="ghost.x"
+      [style.top.px]="ghost.y"
     >
-      <div class="preview-node-inner" [style.--depth]="depth">
-        <div class="preview-node-toolbar">
-          <button
-            type="button"
-            class="preview-node-tool preview-node-tool-drag"
-            (pointerdown)="startNodeMove($event, node)"
-          >
-            <i class="pi pi-arrows-alt"></i>
-            <span>{{ getContentTypeLabel(nodeData.type) }}</span>
-          </button>
-        </div>
-
-        @if (nodeData.type === 'title') {
-          @switch (getPreviewHeadingTag(depth)) {
-            @case ('h1') {
-              <h1>{{ nodeData.textValue || 'Titolo senza contenuto' }}</h1>
-            }
-            @case ('h2') {
-              <h2>{{ nodeData.textValue || 'Titolo senza contenuto' }}</h2>
-            }
-            @default {
-              <h3>{{ nodeData.textValue || 'Titolo senza contenuto' }}</h3>
-            }
-          }
-        }
-
-        @if (nodeData.type === 'description') {
-          <p class="preview-description">{{ nodeData.textValue || 'Descrizione vuota.' }}</p>
-        }
-
-        @if (nodeData.type === 'image') {
-          @if (nodeData.images.length > 0) {
-            <div class="preview-gallery">
-              @for (image of nodeData.images; track image) {
-                <img [src]="image" alt="Preview immagine" />
-              }
-            </div>
-          } @else {
-            <div class="preview-placeholder">Blocco immagini senza elementi caricati.</div>
-          }
-        }
-
-        @if (nodeData.type === 'table') {
-          @if (getTableRows(nodeData.textValue).length > 0) {
-            <div class="preview-table-shell">
-              <table class="preview-table">
-                <tbody>
-                  @for (row of getTableRows(nodeData.textValue); track $index) {
-                    <tr>
-                      @for (cell of row; track $index) {
-                        <td>{{ cell }}</td>
-                      }
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          } @else {
-            <div class="preview-placeholder">Tabella vuota.</div>
-          }
-        }
-
-        @if (nodeData.type === 'cv') {
-          <div class="preview-cv">
-            <div class="preview-cv-head">
-              <span>CV</span>
-              @if (nodeData.fileName) {
-                <small>{{ nodeData.fileName }}</small>
-              }
-            </div>
-            <pre>{{ nodeData.textValue || 'Nessun testo CV disponibile.' }}</pre>
-          </div>
-        }
-
-        @if (visibleNodeChildren(node).length > 0) {
-          <div class="preview-children preview-grid">
-            @for (child of visibleNodeChildren(node); track trackNode($index, child)) {
-              <ng-container
-                [ngTemplateOutlet]="previewNode"
-                [ngTemplateOutletContext]="{ $implicit: child, depth: depth + 1 }"
-              />
-            }
-          </div>
-        }
-
-        <button
-          type="button"
-          class="preview-resize-handle preview-resize-right"
-          (pointerdown)="startNodeResize($event, node, 'resize-x')"
-        ></button>
-        <button
-          type="button"
-          class="preview-resize-handle preview-resize-bottom"
-          (pointerdown)="startNodeResize($event, node, 'resize-y')"
-        ></button>
-        <button
-          type="button"
-          class="preview-resize-handle preview-resize-corner"
-          (pointerdown)="startNodeResize($event, node, 'resize-both')"
-        >
-          <i class="pi pi-expand"></i>
-        </button>
-      </div>
-    </section>
+      <span>{{ ghost.label }}</span>
+      <small>{{ ghost.active ? 'Rilascia per inserire' : 'Portalo dentro il canvas' }}</small>
+    </div>
   }
-</ng-template>
+</div>

@@ -39,13 +39,33 @@ export interface UserPortfolioSummaryDto {
   public: boolean;
 }
 
+export type PortfolioTextAlign = 'left' | 'center' | 'right';
+export type PortfolioTextVerticalAlign = 'start' | 'center' | 'end';
+
+export interface PortfolioTextStyleDto {
+  fontSize?: number;
+  textColor?: string;
+  textAlign?: PortfolioTextAlign;
+  verticalAlign?: PortfolioTextVerticalAlign;
+  bold?: boolean;
+  italic?: boolean;
+}
+
 export interface PortfolioModuleDto {
   type: string;
   label: string;
   value?: string;
   values?: string[];
+  subtitle?: string;
+  buttonLabel?: string;
+  url?: string;
   fileName?: string;
   fileData?: string;
+  slotId?: string;
+  templateId?: string;
+  helperText?: string;
+  locked?: boolean;
+  textStyle?: PortfolioTextStyleDto;
   layout?: {
     columnStart?: number;
     rowStart?: number;
@@ -79,7 +99,7 @@ export interface UserProfileDto {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AuthApiService {
   private readonly http = inject(HttpClient);
@@ -96,8 +116,8 @@ export class AuthApiService {
   refreshSession(refreshToken: string): Observable<LoginResponseDto> {
     return this.http.get<LoginResponseDto>(`${this.apiUrl}/api/auth/refresh`, {
       headers: {
-        Authorization: `Bearer ${refreshToken}`
-      }
+        Authorization: `Bearer ${refreshToken}`,
+      },
     });
   }
 
@@ -121,7 +141,10 @@ export class AuthApiService {
     return this.http.post<PortfolioPublicDto>(`${this.apiUrl}/api/portfolios`, payload);
   }
 
-  updatePortfolio(slug: string, payload: CreatePortfolioRequestDto): Observable<PortfolioPublicDto> {
+  updatePortfolio(
+    slug: string,
+    payload: CreatePortfolioRequestDto,
+  ): Observable<PortfolioPublicDto> {
     return this.http.put<PortfolioPublicDto>(`${this.apiUrl}/api/portfolios/${slug}`, payload);
   }
 
