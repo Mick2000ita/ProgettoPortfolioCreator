@@ -33,6 +33,7 @@ export class AuthSessionService {
   private readonly authApiService = inject(AuthApiService);
 
   private readonly sessionState = signal<SessionState | null>(null);
+  private refreshInFlight: Promise<string | null> | null = null;
 
   readonly user = computed(() => this.sessionState()?.user ?? null);
   readonly authenticated = computed(() => this.sessionState() !== null);
@@ -112,6 +113,20 @@ export class AuthSessionService {
     return this.sessionState()?.refreshToken ?? this.readCookie(REFRESH_TOKEN_COOKIE);
   }
 
+  async refreshAccessToken() {
+    if (this.refreshInFlight) {
+      return this.refreshInFlight;
+    }
+
+    this.refreshInFlight = this.performTokenRefresh();
+
+    try {
+      return await this.refreshInFlight;
+    } finally {
+      this.refreshInFlight = null;
+    }
+  }
+
   clearSession() {
     if (this.isBrowser()) {
       this.deleteCookie(ACCESS_TOKEN_COOKIE);
@@ -154,6 +169,29 @@ export class AuthSessionService {
     }
 
     this.sessionState.set(session);
+  }
+
+  private async performTokenRefresh() {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) {
+      this.clearSession();
+      return null;
+    }
+
+    const rememberMe = this.readCookie(REMEMBER_ME_COOKIE) === 'true';
+    const provider = this.readProviderCookie();
+
+    try {
+      const response = await firstValueFrom(this.authApiService.refreshSession(refreshToken));
+      this.saveLoginSession(response, {
+        rememberMe,
+        provider
+      });
+      return response.accessToken;
+    } catch {
+      this.clearSession();
+      return null;
+    }
   }
 
   private writeCookie(name: string, value: string, maxAgeSeconds?: number) {

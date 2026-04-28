@@ -1,6 +1,7 @@
 import { AfterViewInit, Component, ElementRef, EventEmitter, Output, ViewChild, inject } from '@angular/core';
 import { input } from '@angular/core';
 import { Router } from '@angular/router';
+import { environment } from '../../environments/environment';
 import { AuthApiService } from '../services/auth-api.service';
 import { AuthSessionService } from '../services/auth-session.service';
 
@@ -27,9 +28,15 @@ export class GoogleLoginComponent implements AfterViewInit {
 
     const hostElement = this.googleButtonHost.nativeElement;
     hostElement.innerHTML = '';
+    const clientId = environment.googleClientId?.trim();
+
+    if (!clientId) {
+      this.loginError.emit('Google Login non configurato: client ID mancante');
+      return;
+    }
 
     google.accounts.id.initialize({
-      client_id: '707290238106-bu0h2h60r609ib3k2ia53cr0cbaaofer.apps.googleusercontent.com',
+      client_id: clientId,
       callback: (response: any) => this.login(response.credential)
     });
 

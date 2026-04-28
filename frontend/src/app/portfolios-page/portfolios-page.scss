@@ -113,6 +113,14 @@
   background: rgba(131, 209, 180, 0.12);
 }
 
+:host ::ng-deep .action-button-private.p-button {
+  color: #efc7a9;
+}
+
+:host ::ng-deep .action-button-private.p-button:hover {
+  background: rgba(209, 142, 98, 0.14);
+}
+
 :host ::ng-deep .action-button-danger.p-button {
   color: #f2a4a4;
 }

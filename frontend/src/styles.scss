@@ -1,5 +1,5 @@
 /* You can add global styles to this file, and also import other style files */
-@import "primeicons/primeicons.css";
+@import 'primeicons/primeicons.css';
 
 @font-face {
   font-family: 'Poppins';
@@ -34,4 +34,157 @@ app-root {
   --portfolio-page-padding-mobile: 1.15rem;
   --portfolio-grid-gap: 1rem;
   --portfolio-grid-row-height: 56px;
+}
+
+.app-code-theme {
+  --syntax-base: rgba(238, 245, 238, 0.94);
+  --syntax-comment: #7f9387;
+  --syntax-keyword: #ff9f68;
+  --syntax-string: #8fe388;
+  --syntax-number: #d4a5ff;
+  --syntax-operator: #ffd166;
+  --syntax-punctuation: #9dc4ff;
+  --syntax-tag: #53d6c7;
+  --syntax-attribute: #7cc7ff;
+  --syntax-function: #ffe28a;
+  --syntax-variable: #76e5d1;
+  --syntax-boolean: #ffb86c;
+}
+
+.app-code-theme[data-code-language='typescript'],
+.app-code-theme[data-code-language='javascript'],
+.app-code-theme[data-code-language='java'] {
+  --syntax-keyword: #8cb4ff;
+  --syntax-function: #ffe27a;
+  --syntax-operator: #ff8f70;
+}
+
+.app-code-theme[data-code-language='html'] {
+  --syntax-tag: #5de4d7;
+  --syntax-attribute: #ffd479;
+  --syntax-punctuation: #8bd3ff;
+}
+
+.app-code-theme[data-code-language='css'],
+.app-code-theme[data-code-language='scss'] {
+  --syntax-keyword: #ffb86c;
+  --syntax-attribute: #7dd3fc;
+  --syntax-number: #ff7ab6;
+  --syntax-punctuation: #b0c8ff;
+}
+
+.app-code-theme[data-code-language='json'] {
+  --syntax-attribute: #7dd3fc;
+  --syntax-string: #95e38f;
+  --syntax-number: #d9a8ff;
+  --syntax-boolean: #ffba7a;
+}
+
+.app-code-theme[data-code-language='bash'] {
+  --syntax-keyword: #f6d06f;
+  --syntax-variable: #67e8d6;
+  --syntax-operator: #ff9370;
+}
+
+.app-code-theme[data-code-language='python'] {
+  --syntax-keyword: #72b7ff;
+  --syntax-function: #ffd56f;
+  --syntax-operator: #ff9f68;
+}
+
+.app-code-theme[data-code-language='sql'] {
+  --syntax-keyword: #73b7ff;
+  --syntax-string: #8ee38f;
+  --syntax-operator: #ff9d7a;
+  --syntax-number: #d9a1ff;
+}
+
+.app-syntax-code,
+.app-syntax-code code {
+  margin: 0;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: var(--text-font-size, 15px);
+  line-height: 1.65;
+  text-align: left;
+}
+
+.app-syntax-code {
+  overflow: auto;
+  max-width: 100%;
+  max-height: 100%;
+  padding: 0.1rem 0;
+  white-space: pre-wrap;
+  color: var(--syntax-base);
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+}
+
+.app-syntax-code .hljs {
+  display: block;
+  min-height: 1.65em;
+  color: var(--syntax-base);
+  background: transparent;
+}
+
+.app-syntax-code .hljs-comment,
+.app-syntax-code .hljs-quote {
+  color: var(--syntax-comment);
+}
+
+.app-syntax-code .hljs-keyword,
+.app-syntax-code .hljs-selector-tag,
+.app-syntax-code .hljs-literal {
+  color: var(--syntax-keyword);
+}
+
+.app-syntax-code .hljs-string,
+.app-syntax-code .hljs-regexp,
+.app-syntax-code .hljs-template-string {
+  color: var(--syntax-string);
+}
+
+.app-syntax-code .hljs-number,
+.app-syntax-code .hljs-symbol,
+.app-syntax-code .hljs-bullet {
+  color: var(--syntax-number);
+}
+
+.app-syntax-code .hljs-operator {
+  color: var(--syntax-operator);
+}
+
+.app-syntax-code .hljs-punctuation {
+  color: var(--syntax-punctuation);
+}
+
+.app-syntax-code .hljs-tag,
+.app-syntax-code .hljs-name {
+  color: var(--syntax-tag);
+}
+
+.app-syntax-code .hljs-attr,
+.app-syntax-code .hljs-attribute,
+.app-syntax-code .hljs-selector-attr,
+.app-syntax-code .hljs-selector-class,
+.app-syntax-code .hljs-selector-id,
+.app-syntax-code .hljs-property {
+  color: var(--syntax-attribute);
+}
+
+.app-syntax-code .hljs-title,
+.app-syntax-code .hljs-title.function_,
+.app-syntax-code .hljs-function .hljs-title,
+.app-syntax-code .hljs-built_in {
+  color: var(--syntax-function);
+}
+
+.app-syntax-code .hljs-variable,
+.app-syntax-code .hljs-template-variable,
+.app-syntax-code .hljs-params {
+  color: var(--syntax-variable);
+}
+
+.app-syntax-code .hljs-type,
+.app-syntax-code .hljs-boolean {
+  color: var(--syntax-boolean);
 }

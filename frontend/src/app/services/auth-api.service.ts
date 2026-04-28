@@ -49,6 +49,18 @@ export interface PortfolioTextStyleDto {
   verticalAlign?: PortfolioTextVerticalAlign;
   bold?: boolean;
   italic?: boolean;
+  tableBorderWidth?: number;
+}
+
+export interface PortfolioBackgroundImageDto {
+  src: string;
+  values?: string[];
+  positionX?: number;
+  positionY?: number;
+  width?: number;
+  scaleX?: number;
+  scaleY?: number;
+  blur?: number;
 }
 
 export interface PortfolioModuleDto {
@@ -57,6 +69,7 @@ export interface PortfolioModuleDto {
   value?: string;
   values?: string[];
   subtitle?: string;
+  language?: string;
   buttonLabel?: string;
   url?: string;
   fileName?: string;
@@ -66,6 +79,7 @@ export interface PortfolioModuleDto {
   helperText?: string;
   locked?: boolean;
   textStyle?: PortfolioTextStyleDto;
+  backgroundImages?: PortfolioBackgroundImageDto[];
   layout?: {
     columnStart?: number;
     rowStart?: number;
@@ -78,6 +92,7 @@ export interface PortfolioModuleDto {
 export interface CreatePortfolioRequestDto {
   title: string;
   modules: PortfolioModuleDto[];
+  public?: boolean;
 }
 
 export interface PortfolioPublicDto {
@@ -146,6 +161,15 @@ export class AuthApiService {
     payload: CreatePortfolioRequestDto,
   ): Observable<PortfolioPublicDto> {
     return this.http.put<PortfolioPublicDto>(`${this.apiUrl}/api/portfolios/${slug}`, payload);
+  }
+
+  updatePortfolioVisibility(slug: string, isPublic: boolean): Observable<UserPortfolioSummaryDto> {
+    return this.http.put<UserPortfolioSummaryDto>(
+      `${this.apiUrl}/api/portfolios/${slug}/visibility`,
+      {
+        public: isPublic,
+      },
+    );
   }
 
   deletePortfolio(slug: string): Observable<void> {

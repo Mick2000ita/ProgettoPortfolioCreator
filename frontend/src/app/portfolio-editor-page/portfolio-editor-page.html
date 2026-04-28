@@ -13,7 +13,20 @@
             <p>{{ loadError() }}</p>
           </section>
         } @else {
-          <div class="canvas-frame" [style.background]="backgroundColor()">
+          <div class="canvas-frame" [style.background-color]="backgroundColor()">
+            @if (backgroundImages().length > 0) {
+              <div class="background-media-layer" aria-hidden="true">
+                @for (image of backgroundImages(); track $index) {
+                  <img
+                    class="background-media-asset"
+                    [src]="getBackgroundImageSource(image)"
+                    alt=""
+                    [ngStyle]="getBackgroundImageStyle(image)"
+                  />
+                }
+              </div>
+            }
+
             <section
               #canvasSurface
               class="canvas-surface"
@@ -23,7 +36,9 @@
               @if (dragPreviewLayout(); as previewLayout) {
                 <div
                   class="drop-indicator"
-                  [style.grid-column]="previewLayout.columnStart + ' / span ' + previewLayout.columnSpan"
+                  [style.grid-column]="
+                    previewLayout.columnStart + ' / span ' + previewLayout.columnSpan
+                  "
                   [style.grid-row]="previewLayout.rowStart + ' / span ' + previewLayout.rowSpan"
                 ></div>
               }
@@ -45,6 +60,7 @@
                     [class.canvas-item-selected]="isSelectedNode(node)"
                     [class.canvas-item-title]="nodeData.type === 'title'"
                     [class.canvas-item-description]="nodeData.type === 'description'"
+                    [class.canvas-item-code]="nodeData.type === 'code'"
                     [class.canvas-item-image]="nodeData.type === 'image'"
                     [class.canvas-item-carousel]="nodeData.type === 'carousel'"
                     [class.canvas-item-table]="nodeData.type === 'table'"
@@ -60,7 +76,9 @@
                       <header class="canvas-item-header">
                         <div class="canvas-item-label">
                           @if (!isSelectedNode(node)) {
-                            <span class="canvas-item-tag">{{ getContentTypeLabel(nodeData.type) }}</span>
+                            <span class="canvas-item-tag">{{
+                              getContentTypeLabel(nodeData.type)
+                            }}</span>
                           }
                           @if (!isSelectedNode(node)) {
                             <strong>{{ nodeData.label }}</strong>
@@ -78,7 +96,10 @@
 
                       <div class="canvas-item-body">
                         @if (nodeData.type === 'title') {
-                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
+                          <div
+                            class="canvas-text-module"
+                            [ngStyle]="getCanvasTextModuleStyle(nodeData)"
+                          >
                             <input
                               pInputText
                               class="inline-block-input inline-block-title"
@@ -91,13 +112,47 @@
                         }
 
                         @if (nodeData.type === 'description') {
-                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
+                          <div
+                            class="canvas-text-module"
+                            [ngStyle]="getCanvasTextModuleStyle(nodeData)"
+                          >
                             <textarea
                               pTextarea
                               class="inline-block-textarea"
                               rows="5"
                               [value]="nodeData.textValue"
                               placeholder="Aggiungi qui un testo introduttivo o descrittivo."
+                              (pointerdown)="selectNode(node, $event)"
+                              (input)="updateNodeText(node, $event)"
+                            ></textarea>
+                          </div>
+                        }
+
+                        @if (nodeData.type === 'code') {
+                          <div
+                            class="canvas-text-module canvas-code-module"
+                            [ngStyle]="getCanvasTextModuleStyle(nodeData)"
+                          >
+                            <div class="inline-code-head">
+                              <p-select
+                                [options]="codeLanguageOptions"
+                                optionLabel="label"
+                                optionValue="value"
+                                [ngModel]="resolveCodeLanguage(nodeData.language)"
+                                styleClass="inline-block-code-language"
+                                panelStyleClass="code-language-panel"
+                                appendTo="body"
+                                (pointerdown)="selectNode(node, $event)"
+                                (onChange)="updateNodeLanguage(node, $event.value)"
+                              />
+                            </div>
+                            <textarea
+                              pTextarea
+                              class="inline-block-textarea inline-block-code"
+                              rows="10"
+                              [value]="nodeData.textValue"
+                              placeholder="Incolla qui il tuo snippet di codice."
+                              spellcheck="false"
                               (pointerdown)="selectNode(node, $event)"
                               (input)="updateNodeText(node, $event)"
                             ></textarea>
@@ -123,8 +178,14 @@
                                 <img [src]="nodeData.images[0]" alt="Anteprima carousel" />
                                 @if (nodeData.images.length > 1) {
                                   <div class="carousel-editor-dots">
-                                    @for (image of nodeData.images; track image; let slideIndex = $index) {
-                                      <span [class.carousel-editor-dot-active]="slideIndex === 0"></span>
+                                    @for (
+                                      image of nodeData.images;
+                                      track image;
+                                      let slideIndex = $index
+                                    ) {
+                                      <span
+                                        [class.carousel-editor-dot-active]="slideIndex === 0"
+                                      ></span>
                                     }
                                   </div>
                                 }
@@ -142,22 +203,146 @@
                         }
 
                         @if (nodeData.type === 'table') {
-                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
-                            <div class="inline-helper">Una riga per record, celle separate da `;`.</div>
-                            <textarea
-                              pTextarea
-                              class="inline-block-textarea"
-                              rows="6"
-                              [value]="nodeData.textValue"
-                              placeholder="Servizio;Branding;2026"
-                              (pointerdown)="selectNode(node, $event)"
-                              (input)="updateNodeText(node, $event)"
-                            ></textarea>
+                          <div
+                            class="canvas-text-module"
+                            [ngStyle]="getCanvasTextModuleStyle(nodeData)"
+                          >
+                            <div class="table-editor-toolbar">
+                              <div class="inline-helper">
+                                Prima riga = header. Clicca nelle celle come in un foglio di
+                                calcolo.
+                              </div>
+                              @if (isSelectedNode(node)) {
+                                <div class="table-editor-actions">
+                                  <button
+                                    type="button"
+                                    class="table-editor-action"
+                                    (click)="addTableRow(node, $event)"
+                                  >
+                                    + Riga
+                                  </button>
+                                  <button
+                                    type="button"
+                                    class="table-editor-action"
+                                    (click)="addTableColumn(node, $event)"
+                                  >
+                                    + Colonna
+                                  </button>
+                                  <button
+                                    type="button"
+                                    class="table-editor-action table-editor-action-muted"
+                                    (click)="removeTableRow(node, $event)"
+                                  >
+                                    - Riga
+                                  </button>
+                                  <button
+                                    type="button"
+                                    class="table-editor-action table-editor-action-muted"
+                                    (click)="removeTableColumn(node, $event)"
+                                  >
+                                    - Colonna
+                                  </button>
+                                </div>
+                              }
+                            </div>
+
+                            @if (getEditableTableGrid(nodeData); as tableGrid) {
+                              <div
+                                class="table-editor-shell"
+                                (pointerdown)="selectNode(node, $event)"
+                              >
+                                <table class="table-editor-grid">
+                                  <thead>
+                                    <tr>
+                                      <th class="table-editor-corner"></th>
+                                      @for (
+                                        cell of tableGrid[0];
+                                        track $index;
+                                        let columnIndex = $index
+                                      ) {
+                                        <th class="table-editor-axis">
+                                          {{ getSpreadsheetColumnLabel(columnIndex) }}
+                                        </th>
+                                      }
+                                    </tr>
+                                    <tr>
+                                      <th class="table-editor-row-label">H</th>
+                                      @for (
+                                        cell of tableGrid[0];
+                                        track $index;
+                                        let columnIndex = $index
+                                      ) {
+                                        <th class="table-editor-cell table-editor-cell-header">
+                                          <input
+                                            class="table-editor-input"
+                                            [value]="cell"
+                                            [placeholder]="
+                                              'Header ' + getSpreadsheetColumnLabel(columnIndex)
+                                            "
+                                            [attr.data-table-node]="node.key ?? ''"
+                                            [attr.data-table-row]="0"
+                                            [attr.data-table-col]="columnIndex"
+                                            (pointerdown)="selectNode(node, $event)"
+                                            (input)="updateTableCell(node, 0, columnIndex, $event)"
+                                            (keydown)="
+                                              handleTableCellKeydown(node, $event, 0, columnIndex)
+                                            "
+                                          />
+                                        </th>
+                                      }
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    @for (
+                                      row of tableGrid.slice(1);
+                                      track $index;
+                                      let rowOffset = $index
+                                    ) {
+                                      <tr>
+                                        <th class="table-editor-row-label">{{ rowOffset + 1 }}</th>
+                                        @for (cell of row; track $index; let columnIndex = $index) {
+                                          <td class="table-editor-cell">
+                                            <input
+                                              class="table-editor-input"
+                                              [value]="cell"
+                                              placeholder="Dato"
+                                              [attr.data-table-node]="node.key ?? ''"
+                                              [attr.data-table-row]="rowOffset + 1"
+                                              [attr.data-table-col]="columnIndex"
+                                              (pointerdown)="selectNode(node, $event)"
+                                              (input)="
+                                                updateTableCell(
+                                                  node,
+                                                  rowOffset + 1,
+                                                  columnIndex,
+                                                  $event
+                                                )
+                                              "
+                                              (keydown)="
+                                                handleTableCellKeydown(
+                                                  node,
+                                                  $event,
+                                                  rowOffset + 1,
+                                                  columnIndex
+                                                )
+                                              "
+                                            />
+                                          </td>
+                                        }
+                                      </tr>
+                                    }
+                                  </tbody>
+                                </table>
+                              </div>
+                            }
                           </div>
                         }
 
                         @if (nodeData.type === 'quote') {
-                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
+                          <div
+                            class="canvas-text-module"
+                            [ngStyle]="getCanvasTextModuleStyle(nodeData)"
+                          >
                             <textarea
                               pTextarea
                               class="inline-block-textarea inline-block-quote"
@@ -179,8 +364,13 @@
                         }
 
                         @if (nodeData.type === 'stats') {
-                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
-                            <div class="inline-helper">Formato consigliato: `Valore;Etichetta;Dettaglio`.</div>
+                          <div
+                            class="canvas-text-module"
+                            [ngStyle]="getCanvasTextModuleStyle(nodeData)"
+                          >
+                            <div class="inline-helper">
+                              Formato consigliato: `Valore;Etichetta;Dettaglio`.
+                            </div>
                             <textarea
                               pTextarea
                               class="inline-block-textarea"
@@ -194,7 +384,10 @@
                         }
 
                         @if (nodeData.type === 'cta') {
-                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
+                          <div
+                            class="canvas-text-module"
+                            [ngStyle]="getCanvasTextModuleStyle(nodeData)"
+                          >
                             <textarea
                               pTextarea
                               class="inline-block-textarea"
@@ -224,15 +417,23 @@
                         }
 
                         @if (nodeData.type === 'cv') {
-                          <div class="canvas-text-module" [ngStyle]="getCanvasTextModuleStyle(nodeData)">
+                          <div
+                            class="canvas-text-module"
+                            [ngStyle]="getCanvasTextModuleStyle(nodeData)"
+                          >
                             <div class="inline-file-row">
-                              <label class="inline-upload-chip" (pointerdown)="selectNode(node, $event)">
+                              <label
+                                class="inline-upload-chip"
+                                (pointerdown)="selectNode(node, $event)"
+                              >
                                 <input
                                   type="file"
                                   accept="application/pdf"
                                   (change)="onCvSelectedForNode(node, $event)"
                                 />
-                                <span>{{ nodeData.fileName ? 'Sostituisci PDF' : 'Carica PDF' }}</span>
+                                <span>{{
+                                  nodeData.fileName ? 'Sostituisci PDF' : 'Carica PDF'
+                                }}</span>
                               </label>
                               <small>{{ nodeData.fileName || 'Curriculum non caricato' }}</small>
                             </div>
@@ -242,7 +443,9 @@
                             }
 
                             @if (extractionError() && isSelectedNode(node)) {
-                              <div class="inline-helper inline-helper-error">{{ extractionError() }}</div>
+                              <div class="inline-helper inline-helper-error">
+                                {{ extractionError() }}
+                              </div>
                             }
 
                             <textarea
@@ -294,11 +497,7 @@
           <div [formGroup]="portfolioForm">
             <label class="field-block">
               <span>Titolo portfolio</span>
-              <input
-                pInputText
-                formControlName="title"
-                placeholder="Es. Marco Rinaldi Portfolio"
-              />
+              <input pInputText formControlName="title" placeholder="Es. Marco Rinaldi Portfolio" />
             </label>
           </div>
 
@@ -333,6 +532,146 @@
               </button>
             </div>
 
+            @if (selectedNode.type === 'background') {
+              @if (backgroundImages().length > 0) {
+                <div class="background-image-editor-list" style="max-height: 62vh; overflow: auto">
+                  @for (image of backgroundImages(); track $index; let imageIndex = $index) {
+                    <section class="background-image-editor-card">
+                      <figure class="background-image-editor-preview">
+                        <img
+                          [src]="getBackgroundImageSource(image)"
+                          alt="Preview immagine di sfondo"
+                        />
+                      </figure>
+
+                      <div class="helper-box">
+                        {{
+                          getBackgroundImageSlideCount(image) > 1 ? 'Carousel' : 'Immagine statica'
+                        }}
+                        · {{ getBackgroundImageSlideCount(image) }}
+                        {{ getBackgroundImageSlideCount(image) === 1 ? 'slide' : 'slide' }}
+                      </div>
+
+                      <label class="field-block">
+                        <span>Aggiungi slide</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          (change)="appendBackgroundCarouselSlides(imageIndex, $event)"
+                        />
+                      </label>
+
+                      <div class="field-grid">
+                        <label class="field-block">
+                          <span>X {{ image.positionX ?? 50 }}%</span>
+                          <input
+                            type="range"
+                            min="-100"
+                            max="200"
+                            step="1"
+                            [value]="image.positionX ?? 50"
+                            (input)="
+                              updateBackgroundImageNumberField(imageIndex, 'positionX', $event)
+                            "
+                          />
+                        </label>
+
+                        <label class="field-block">
+                          <span>Y {{ image.positionY ?? 50 }}%</span>
+                          <input
+                            type="range"
+                            min="-100"
+                            max="200"
+                            step="1"
+                            [value]="image.positionY ?? 50"
+                            (input)="
+                              updateBackgroundImageNumberField(imageIndex, 'positionY', $event)
+                            "
+                          />
+                        </label>
+
+                        <label class="field-block">
+                          <span>Scala X {{ image.scaleX ?? image.width ?? 28 }}%</span>
+                          <input
+                            type="range"
+                            min="8"
+                            max="300"
+                            step="1"
+                            [value]="image.scaleX ?? image.width ?? 28"
+                            (input)="updateBackgroundImageNumberField(imageIndex, 'scaleX', $event)"
+                          />
+                        </label>
+
+                        <label class="field-block">
+                          <span>Scala Y {{ image.scaleY ?? image.width ?? 28 }}%</span>
+                          <input
+                            type="range"
+                            min="8"
+                            max="300"
+                            step="1"
+                            [value]="image.scaleY ?? image.width ?? 28"
+                            (input)="updateBackgroundImageNumberField(imageIndex, 'scaleY', $event)"
+                          />
+                        </label>
+
+                        <label class="field-block">
+                          <span>Sfocatura {{ image.blur ?? 0 }}px</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="40"
+                            step="1"
+                            [value]="image.blur ?? 0"
+                            (input)="updateBackgroundImageNumberField(imageIndex, 'blur', $event)"
+                          />
+                        </label>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="remove-button"
+                        (click)="removeBackgroundImage(imageIndex)"
+                      >
+                        Rimuovi immagine
+                      </button>
+                    </section>
+                  }
+                </div>
+              } @else {
+                <div class="helper-box">
+                  Nessuna immagine di sfondo caricata. Il colore continua a funzionare come base.
+                </div>
+              }
+
+              <label class="field-block">
+                <span>Immagini di sfondo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  (change)="onBackgroundImagesSelected($event)"
+                />
+                <small
+                  >Carica uno o piu visual statici e poi regola posizione, scala e sfocatura.</small
+                >
+              </label>
+
+              <label class="field-block">
+                <span>Carousel di sfondo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  (change)="onBackgroundCarouselSelected($event)"
+                />
+                <small
+                  >Seleziona piu immagini per creare un solo layer di sfondo che scorre nel
+                  tempo.</small
+                >
+              </label>
+            }
+
             @if (selectedNode.type === 'image') {
               <label class="field-block">
                 <span>Carica immagine</span>
@@ -349,7 +688,8 @@
                 </div>
               } @else {
                 <div class="helper-box">
-                  Nessuna immagine caricata. Quando ne aggiungi una, la preview compare qui e nel canvas.
+                  Nessuna immagine caricata. Quando ne aggiungi una, la preview compare qui e nel
+                  canvas.
                 </div>
               }
             }
@@ -361,9 +701,7 @@
               </label>
 
               @if (selectedNode.images.length > 0) {
-                <div class="helper-box">
-                  {{ selectedNode.images.length }} slide nel carousel.
-                </div>
+                <div class="helper-box">{{ selectedNode.images.length }} slide nel carousel.</div>
 
                 <div class="inspector-image-grid">
                   @for (image of selectedNode.images; track image; let imageIndex = $index) {
@@ -381,9 +719,30 @@
               }
             }
 
+            @if (selectedNode.type === 'code') {
+              <label class="field-block">
+                <span>Linguaggio</span>
+                <p-select
+                  [options]="codeLanguageOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  [ngModel]="resolveCodeLanguage(selectedNode.language)"
+                  styleClass="code-language-select"
+                  panelStyleClass="code-language-panel"
+                  appendTo="body"
+                  (onChange)="updateSelectedLanguage($event.value)"
+                />
+                <small>
+                  Aggiorna tema e syntax highlighting dello snippet nell editor e nella pagina
+                  pubblica.
+                </small>
+              </label>
+            }
+
             @if (supportsTextFormatting(selectedNode.type)) {
               <div class="helper-box">
-                Modifica il contenuto direttamente nel blocco sul canvas. Qui trovi solo i controlli di stile.
+                Modifica il contenuto direttamente nel blocco sul canvas. Qui trovi solo i controlli
+                di stile.
               </div>
 
               <section class="format-panel">
@@ -420,7 +779,9 @@
                     <button
                       type="button"
                       class="format-toggle"
-                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).textAlign === 'left'"
+                      [class.format-toggle-active]="
+                        getResolvedTextStyle(selectedNode).textAlign === 'left'
+                      "
                       (click)="updateSelectedTextAlign('left')"
                     >
                       Sinistra
@@ -428,7 +789,9 @@
                     <button
                       type="button"
                       class="format-toggle"
-                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).textAlign === 'center'"
+                      [class.format-toggle-active]="
+                        getResolvedTextStyle(selectedNode).textAlign === 'center'
+                      "
                       (click)="updateSelectedTextAlign('center')"
                     >
                       Centro
@@ -436,7 +799,9 @@
                     <button
                       type="button"
                       class="format-toggle"
-                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).textAlign === 'right'"
+                      [class.format-toggle-active]="
+                        getResolvedTextStyle(selectedNode).textAlign === 'right'
+                      "
                       (click)="updateSelectedTextAlign('right')"
                     >
                       Destra
@@ -450,7 +815,9 @@
                     <button
                       type="button"
                       class="format-toggle"
-                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).verticalAlign === 'start'"
+                      [class.format-toggle-active]="
+                        getResolvedTextStyle(selectedNode).verticalAlign === 'start'
+                      "
                       (click)="updateSelectedVerticalAlign('start')"
                     >
                       Alto
@@ -458,7 +825,9 @@
                     <button
                       type="button"
                       class="format-toggle"
-                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).verticalAlign === 'center'"
+                      [class.format-toggle-active]="
+                        getResolvedTextStyle(selectedNode).verticalAlign === 'center'
+                      "
                       (click)="updateSelectedVerticalAlign('center')"
                     >
                       Centro
@@ -466,7 +835,9 @@
                     <button
                       type="button"
                       class="format-toggle"
-                      [class.format-toggle-active]="getResolvedTextStyle(selectedNode).verticalAlign === 'end'"
+                      [class.format-toggle-active]="
+                        getResolvedTextStyle(selectedNode).verticalAlign === 'end'
+                      "
                       (click)="updateSelectedVerticalAlign('end')"
                     >
                       Basso
@@ -495,6 +866,23 @@
                     </button>
                   </div>
                 </div>
+
+                @if (selectedNode.type === 'table') {
+                  <label class="field-block">
+                    <span
+                      >Spessore righe
+                      {{ getResolvedTextStyle(selectedNode).tableBorderWidth }}px</span
+                    >
+                    <input
+                      type="range"
+                      min="0"
+                      max="12"
+                      step="0.5"
+                      [value]="getResolvedTextStyle(selectedNode).tableBorderWidth"
+                      (input)="updateSelectedTableBorderWidth($event)"
+                    />
+                  </label>
+                }
               </section>
             }
           </section>

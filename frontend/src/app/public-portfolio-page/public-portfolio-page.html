@@ -1,8 +1,4 @@
-<div
-  class="public-shell"
-  [style.background]="backgroundColor()"
-  [style.--public-page-bg]="backgroundColor()"
->
+<div class="public-shell" [style.--public-page-bg]="backgroundColor()">
   @if (notFound()) {
     <section class="public-state">
       <h1>Portfolio non trovato</h1>
@@ -15,13 +11,31 @@
     </section>
   } @else if (portfolio(); as currentPortfolio) {
     <section class="public-frame">
+      @if (backgroundImages().length > 0) {
+        <div class="background-media-layer" aria-hidden="true">
+          @for (image of backgroundImages(); track $index) {
+            <img
+              class="background-media-asset"
+              [src]="getBackgroundImageSource(image)"
+              alt=""
+              [ngStyle]="getBackgroundImageStyle(image)"
+            />
+          }
+        </div>
+      }
+
       @if (renderableModules().length > 0) {
         <div class="public-canvas" [style.--public-canvas-rows]="canvasRowCount()">
-          @for (module of renderableModules(); track trackModule($index, module); let moduleIndex = $index) {
+          @for (
+            module of renderableModules();
+            track trackModule($index, module);
+            let moduleIndex = $index
+          ) {
             <article
               class="public-node"
               [class.public-node-title]="module.type === 'title'"
               [class.public-node-description]="module.type === 'description'"
+              [class.public-node-code]="module.type === 'code'"
               [class.public-node-image]="module.type === 'image'"
               [class.public-node-carousel]="module.type === 'carousel'"
               [class.public-node-table]="module.type === 'table'"
@@ -44,6 +58,26 @@
                 </div>
               }
 
+              @if (module.type === 'code') {
+                <div class="public-text-module" [ngStyle]="getTextModuleStyle(module)">
+                  <section
+                    class="public-code-box app-code-theme"
+                    [attr.data-code-language]="resolveCodeLanguage(module.language)"
+                  >
+                    <div class="public-code-meta">
+                      <span>{{ getCodeLanguage(module) }}</span>
+                    </div>
+                    @if (module.value) {
+                      <pre
+                        class="app-syntax-code"
+                      ><code [innerHTML]="getHighlightedCodeHtml(module.value, module.language)"></code></pre>
+                    } @else {
+                      <div class="module-placeholder">Nessuno snippet disponibile.</div>
+                    }
+                  </section>
+                </div>
+              }
+
               @if (module.type === 'image') {
                 @if (getPrimaryImage(module); as image) {
                   <div class="public-image-shell">
@@ -58,10 +92,7 @@
                 @if (module.values?.length) {
                   <section class="public-carousel-shell">
                     <div class="public-carousel-media">
-                      <img
-                        [src]="getCarouselImage(module, moduleIndex)"
-                        alt="Carousel portfolio"
-                      />
+                      <img [src]="getCarouselImage(module, moduleIndex)" alt="Carousel portfolio" />
                       @if ((module.values?.length ?? 0) > 1) {
                         <div class="public-carousel-controls">
                           <button
@@ -104,15 +135,24 @@
                   @if (getTableRows(module.value).length > 0) {
                     <div class="public-table-shell">
                       <table class="public-table">
-                        <tbody>
-                          @for (row of getTableRows(module.value); track $index) {
-                            <tr>
-                              @for (cell of row; track $index) {
-                                <td>{{ cell }}</td>
-                              }
-                            </tr>
-                          }
-                        </tbody>
+                        <thead>
+                          <tr>
+                            @for (cell of getTableHeaderRow(module.value); track $index) {
+                              <th>{{ cell }}</th>
+                            }
+                          </tr>
+                        </thead>
+                        @if (getTableBodyRows(module.value).length > 0) {
+                          <tbody>
+                            @for (row of getTableBodyRows(module.value); track $index) {
+                              <tr>
+                                @for (cell of row; track $index) {
+                                  <td>{{ cell }}</td>
+                                }
+                              </tr>
+                            }
+                          </tbody>
+                        }
                       </table>
                     </div>
                   } @else {
@@ -179,7 +219,11 @@
                     }
 
                     @if (module.fileData) {
-                      <a class="cv-link" [href]="module.fileData" [attr.download]="module.fileName || 'cv.pdf'">
+                      <a
+                        class="cv-link"
+                        [href]="module.fileData"
+                        [attr.download]="module.fileName || 'cv.pdf'"
+                      >
                         Scarica CV in PDF
                       </a>
                     }

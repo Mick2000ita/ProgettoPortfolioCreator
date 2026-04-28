@@ -18,6 +18,7 @@ import com.jmportfolio.jm.domains.portfolios.application.PortfolioService;
 import com.jmportfolio.jm.domains.portfolios.client.dto.CreatePortfolioRequestDto;
 import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioPublicDto;
 import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioSummaryDto;
+import com.jmportfolio.jm.domains.portfolios.client.dto.UpdatePortfolioVisibilityRequestDto;
 
 import jakarta.validation.Valid;
 
@@ -54,6 +55,15 @@ public class PortfolioController {
             @PathVariable String slug,
             @Valid @RequestBody CreatePortfolioRequestDto request) {
         return portfolioService.updatePortfolio(authenticatedUser.getUsername(), slug, request);
+    }
+
+    @PutMapping("/{slug}/visibility")
+    public PortfolioSummaryDto updatePortfolioVisibility(
+            @AuthenticationPrincipal ExtendedAuthUser authenticatedUser,
+            @PathVariable String slug,
+            @RequestBody UpdatePortfolioVisibilityRequestDto request) {
+        return portfolioService.updatePortfolioVisibility(authenticatedUser.getUsername(), slug,
+                request.isPublic());
     }
 
     @DeleteMapping("/{slug}")

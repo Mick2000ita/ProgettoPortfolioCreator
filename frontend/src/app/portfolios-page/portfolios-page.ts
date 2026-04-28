@@ -22,7 +22,9 @@ export class PortfoliosPage implements OnInit {
 
   protected readonly portfolios = signal<UserPortfolioSummaryDto[]>([]);
   protected readonly isLoading = signal(false);
+  protected readonly loadError = signal(false);
   protected readonly deletingSlug = signal<string | null>(null);
+  protected readonly visibilitySlug = signal<string | null>(null);
 
   ngOnInit() {
     if (!isPlatformBrowser(this.platformId)) {
@@ -30,6 +32,7 @@ export class PortfoliosPage implements OnInit {
     }
 
     this.isLoading.set(true);
+    this.loadError.set(false);
 
     this.authApiService.getMyPortfolios().subscribe({
       next: (portfolios) => {
@@ -37,17 +40,32 @@ export class PortfoliosPage implements OnInit {
         this.isLoading.set(false);
       },
       error: () => {
+        this.loadError.set(true);
         this.isLoading.set(false);
       }
     });
   }
 
-  protected viewPortfolio(slug: string) {
-    void this.router.navigateByUrl(`/${slug}`);
-  }
-
   protected editPortfolio(slug: string) {
     void this.router.navigate(['/portfolios', slug, 'edit']);
+  }
+
+  protected togglePortfolioVisibility(portfolio: UserPortfolioSummaryDto) {
+    this.visibilitySlug.set(portfolio.slug);
+
+    this.authApiService.updatePortfolioVisibility(portfolio.slug, !portfolio.public).subscribe({
+      next: (updatedPortfolio) => {
+        this.portfolios.update((portfolios) =>
+          portfolios.map((currentPortfolio) =>
+            currentPortfolio.slug === updatedPortfolio.slug ? updatedPortfolio : currentPortfolio
+          )
+        );
+        this.visibilitySlug.set(null);
+      },
+      error: () => {
+        this.visibilitySlug.set(null);
+      }
+    });
   }
 
   protected confirmDeletePortfolio(portfolio: UserPortfolioSummaryDto) {

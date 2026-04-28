@@ -2,15 +2,20 @@ import { NgStyle, isPlatformBrowser } from '@angular/common';
 import { Component, OnDestroy, OnInit, PLATFORM_ID, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import {
+  PortfolioBackgroundImageDto,
   AuthApiService,
   PortfolioModuleDto,
   PortfolioPublicDto,
 } from '../services/auth-api.service';
+import { renderHighlightedCode } from '../services/code-highlight';
 import {
+  getCodeLanguageLabel,
   ContentType,
   DEFAULT_BACKGROUND_COLOR,
   EditorNodeTextStyle,
   EditorNodeLayout,
+  resolveCodeLanguage,
+  resolveBackgroundImages,
   resolveTextStyle,
   supportsTextFormatting,
 } from '../services/portfolio-editor-state.service';
@@ -50,6 +55,7 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
   protected readonly notFound = signal(false);
   protected readonly isLoading = signal(true);
   protected readonly carouselIndexes = signal<Record<string, number>>({});
+  protected readonly backgroundFrame = signal(0);
   protected readonly renderableModules = computed(() =>
     this.buildRenderableModules(this.portfolio()?.modules ?? []),
   );
@@ -58,6 +64,12 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
       .reverse()
       .find((module) => module.type === 'background');
     return backgroundModule?.value || DEFAULT_BACKGROUND_COLOR;
+  });
+  protected readonly backgroundImages = computed(() => {
+    const backgroundModule = [...this.flattenModules(this.portfolio()?.modules ?? [])]
+      .reverse()
+      .find((module) => module.type === 'background');
+    return resolveBackgroundImages(backgroundModule?.backgroundImages);
   });
   protected readonly canvasRowCount = computed(() => {
     const bottomEdge = this.renderableModules().reduce((maxBottom, module) => {
@@ -123,6 +135,7 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
 
   protected getTextModuleStyle(module: RenderableModule) {
     const textStyle = resolveTextStyle(module.type as ContentType, module.textStyle);
+    const textEffects = this.getTextContrastEffects(textStyle.textColor);
     const style: Record<string, string> = {
       '--text-font-size': `${textStyle.fontSize}px`,
       '--text-align': textStyle.textAlign,
@@ -130,13 +143,82 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
       '--text-vertical-align': this.getVerticalAlignValue(textStyle.verticalAlign),
       '--text-font-weight': textStyle.bold ? '700' : '400',
       '--text-font-style': textStyle.italic ? 'italic' : 'normal',
+      '--table-border-width': `${textStyle.tableBorderWidth}px`,
+      '--text-shadow': textEffects.shadow,
+      '--text-stroke-width': textEffects.strokeWidth,
+      '--text-stroke-color': textEffects.strokeColor,
     };
 
     if (textStyle.textColor) {
       style['--text-color'] = textStyle.textColor;
+      style['color'] = textStyle.textColor;
+      style['-webkit-text-fill-color'] = textStyle.textColor;
     }
 
     return style;
+  }
+
+  private getTextContrastEffects(textColor?: string) {
+    const rgb = this.parseHexColor(textColor);
+    if (!rgb) {
+      return {
+        shadow:
+          '0 1px 1px rgba(0, 0, 0, 0.52), 0 0 18px rgba(0, 0, 0, 0.28), 0 0 1px rgba(248, 244, 236, 0.22)',
+        strokeWidth: '0px',
+        strokeColor: 'transparent',
+      };
+    }
+
+    const luminance = this.getRelativeLuminance(rgb.r, rgb.g, rgb.b);
+    if (luminance < 0.36) {
+      return {
+        shadow:
+          '0 0 1px rgba(255, 255, 255, 0.98), 0 0 10px rgba(255, 255, 255, 0.34), 0 1px 2px rgba(255, 255, 255, 0.28)',
+        strokeWidth: '0.45px',
+        strokeColor: 'rgba(250, 247, 238, 0.82)',
+      };
+    }
+
+    return {
+      shadow: '0 1px 1px rgba(0, 0, 0, 0.56), 0 0 18px rgba(0, 0, 0, 0.24)',
+      strokeWidth: '0px',
+      strokeColor: 'transparent',
+    };
+  }
+
+  private parseHexColor(value?: string) {
+    if (!value || !value.startsWith('#')) {
+      return null;
+    }
+
+    const hex = value.slice(1);
+    if (hex.length === 3) {
+      const [r, g, b] = hex.split('');
+      return {
+        r: Number.parseInt(`${r}${r}`, 16),
+        g: Number.parseInt(`${g}${g}`, 16),
+        b: Number.parseInt(`${b}${b}`, 16),
+      };
+    }
+
+    if (hex.length !== 6) {
+      return null;
+    }
+
+    return {
+      r: Number.parseInt(hex.slice(0, 2), 16),
+      g: Number.parseInt(hex.slice(2, 4), 16),
+      b: Number.parseInt(hex.slice(4, 6), 16),
+    };
+  }
+
+  private getRelativeLuminance(r: number, g: number, b: number) {
+    const [red, green, blue] = [r, g, b].map((channel) => {
+      const normalized = channel / 255;
+      return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+    });
+
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
   }
 
   protected getTableRows(value?: string) {
@@ -144,6 +226,14 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
       .split('\n')
       .map((row) => row.split(';').map((cell) => cell.trim()))
       .filter((row) => row.some((cell) => Boolean(cell)));
+  }
+
+  protected getTableHeaderRow(value?: string) {
+    return this.getTableRows(value)[0] ?? [];
+  }
+
+  protected getTableBodyRows(value?: string) {
+    return this.getTableRows(value).slice(1);
   }
 
   protected getStatRows(value?: string): StatRow[] {
@@ -156,6 +246,18 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
         label,
         detail,
       }));
+  }
+
+  protected getCodeLanguage(module: RenderableModule) {
+    return getCodeLanguageLabel(module.language);
+  }
+
+  protected resolveCodeLanguage(language?: string | null) {
+    return resolveCodeLanguage(language);
+  }
+
+  protected getHighlightedCodeHtml(code: string, language?: string | null) {
+    return renderHighlightedCode(code, resolveCodeLanguage(language));
   }
 
   protected getPrimaryImage(module: RenderableModule) {
@@ -175,6 +277,25 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
 
   protected getCarouselImage(module: RenderableModule, index: number) {
     return module.values?.[this.getCarouselSlide(module, index)] ?? '';
+  }
+
+  protected getBackgroundImageStyle(image: PortfolioBackgroundImageDto) {
+    return {
+      left: `${image.positionX ?? 50}%`,
+      top: `${image.positionY ?? 50}%`,
+      width: `${image.scaleX ?? image.width ?? 28}%`,
+      height: `${image.scaleY ?? image.width ?? 28}%`,
+      filter: `blur(${image.blur ?? 0}px)`,
+    };
+  }
+
+  protected getBackgroundImageSource(image: PortfolioBackgroundImageDto) {
+    const slides = image.values?.length ? image.values : image.src ? [image.src] : [];
+    if (slides.length <= 1) {
+      return slides[0] ?? '';
+    }
+
+    return slides[this.backgroundFrame() % slides.length] ?? slides[0] ?? '';
   }
 
   protected shiftCarousel(module: RenderableModule, index: number, direction: -1 | 1) {
@@ -199,6 +320,7 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
 
     this.autoplayIntervalId = window.setInterval(() => {
       const modules = this.renderableModules();
+      this.backgroundFrame.update((frame) => frame + 1);
       if (!modules.length) {
         return;
       }
@@ -255,7 +377,10 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
         values: normalizedValues,
         textStyle: supportsTextFormatting(normalizedType) ? module.textStyle : undefined,
         resolvedLayout: shouldScaleLegacyModules
-          ? this.normalizeLayout(normalizedType, this.scaleLegacyLayout(normalizedType, module.layout))
+          ? this.normalizeLayout(
+              normalizedType,
+              this.scaleLegacyLayout(normalizedType, module.layout),
+            )
           : this.normalizeLayout(normalizedType, module.layout),
       };
     });
@@ -269,6 +394,7 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
     return (
       type === 'title' ||
       type === 'description' ||
+      type === 'code' ||
       type === 'image' ||
       type === 'carousel' ||
       type === 'table' ||
@@ -286,6 +412,8 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
         return { columnStart: 3, rowStart: 3, columnSpan: 22, rowSpan: 8 };
       case 'description':
         return { columnStart: 3, rowStart: 12, columnSpan: 18, rowSpan: 12 };
+      case 'code':
+        return { columnStart: 4, rowStart: 12, columnSpan: 24, rowSpan: 14 };
       case 'image':
         return { columnStart: 22, rowStart: 12, columnSpan: 18, rowSpan: 16 };
       case 'carousel':
@@ -316,7 +444,7 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
         ? 12
         : type === 'cta'
           ? 14
-          : type === 'quote' || type === 'stats' || type === 'carousel'
+          : type === 'quote' || type === 'stats' || type === 'carousel' || type === 'code'
             ? 12
             : 10;
     const minRowSpan =
@@ -324,7 +452,7 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
         ? 6
         : type === 'cta'
           ? 4
-          : type === 'quote' || type === 'stats'
+          : type === 'quote' || type === 'stats' || type === 'code'
             ? 6
             : type === 'image'
               ? 10
@@ -341,7 +469,12 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
       CANVAS_COLUMNS - columnSpan + 1,
       fallback.columnStart,
     );
-    const rowSpan = this.clampInteger(layout?.rowSpan, minRowSpan, MAX_CANVAS_ROWS, fallback.rowSpan);
+    const rowSpan = this.clampInteger(
+      layout?.rowSpan,
+      minRowSpan,
+      MAX_CANVAS_ROWS,
+      fallback.rowSpan,
+    );
     const rowStart = this.clampInteger(
       layout?.rowStart,
       1,
@@ -368,8 +501,8 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
     const rowSpan = layout?.rowSpan ?? fallback.rowSpan;
 
     return {
-      columnStart: ((columnStart - 1) * LEGACY_COLUMN_SCALE) + 1,
-      rowStart: ((rowStart - 1) * LEGACY_ROW_SCALE) + 1,
+      columnStart: (columnStart - 1) * LEGACY_COLUMN_SCALE + 1,
+      rowStart: (rowStart - 1) * LEGACY_ROW_SCALE + 1,
       columnSpan: columnSpan * LEGACY_COLUMN_SCALE,
       rowSpan: rowSpan * LEGACY_ROW_SCALE,
     };

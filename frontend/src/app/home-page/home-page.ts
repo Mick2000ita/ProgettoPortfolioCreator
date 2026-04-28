@@ -1,95 +1,90 @@
 import { isPlatformBrowser } from '@angular/common';
-import { Component, OnDestroy, OnInit, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, PLATFORM_ID, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
+import { AuthApiService, UserPortfolioSummaryDto } from '../services/auth-api.service';
 import { AuthSessionService } from '../services/auth-session.service';
-
-interface PortfolioShowcase {
-  title: string;
-  discipline: string;
-  owner: string;
-  description: string;
-  accent: string;
-  tags: string[];
-  stats: Array<{ label: string; value: string }>;
-}
+import {
+  PORTFOLIO_EDITOR_CONTENT_OPTIONS,
+  PORTFOLIO_LAYOUT_TEMPLATES,
+} from '../services/portfolio-editor-state.service';
 
 @Component({
   selector: 'app-home-page',
   imports: [RouterLink, ButtonModule],
   templateUrl: './home-page.html',
-  styleUrl: './home-page.scss'
+  styleUrl: './home-page.scss',
 })
-export class HomePage implements OnInit, OnDestroy {
+export class HomePage implements OnInit {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly authSessionService = inject(AuthSessionService);
-  protected readonly portfolios: PortfolioShowcase[] = [
+  private readonly authApiService = inject(AuthApiService);
+
+  protected readonly user = this.authSessionService.user;
+  protected readonly isAuthenticated = this.authSessionService.authenticated;
+  protected readonly layoutTemplates = PORTFOLIO_LAYOUT_TEMPLATES;
+  protected readonly editorTools = PORTFOLIO_EDITOR_CONTENT_OPTIONS.filter(
+    (option) => option.value !== 'background',
+  );
+  protected readonly workflowSteps = [
     {
-      title: 'Atelier Motion',
-      discipline: 'Motion Designer',
-      owner: 'Giulia Ferri',
+      kicker: '01',
+      title: 'Scegli un layout',
       description:
-        'Uno showcase editoriale con reel, frame di storyboard e casi studio pensati per agenzie creative.',
-      accent: 'linear-gradient(135deg, #d87f47, #7c2f12)',
-      tags: ['Showreel', 'Brand Film', '3D Frames'],
-      stats: [
-        { label: 'Progetti', value: '18' },
-        { label: 'Clienti', value: '9' },
-        { label: 'Anno', value: '2026' }
-      ]
+        'Parti da Editorial Split, Case Study o CV Showcase con slot gia pronti da compilare.',
+      icon: 'pi pi-sitemap',
     },
     {
-      title: 'Code and Craft',
-      discipline: 'Frontend Engineer',
-      owner: 'Marco Rinaldi',
+      kicker: '02',
+      title: 'Compila il canvas',
       description:
-        'Portfolio tecnico con metriche, component library personale e casi studio sul prodotto digitale.',
-      accent: 'linear-gradient(135deg, #0a7a59, #114a54)',
-      tags: ['React', 'Design Systems', 'Case Study'],
-      stats: [
-        { label: 'Deploy', value: '32' },
-        { label: 'UI Kit', value: '12' },
-        { label: 'Team', value: '5' }
-      ]
+        'Aggiungi testi, snippet di codice, immagini, carousel, CV, tabelle, stats e CTA dentro una griglia visuale.',
+      icon: 'pi pi-th-large',
     },
     {
-      title: 'Nordic Frames',
-      discipline: 'Photographer',
-      owner: 'Elena Sala',
-      description:
-        'Griglia immersiva con focus su ritratti, travel editorial e landing narrativa per shooting premium.',
-      accent: 'linear-gradient(135deg, #5976d6, #1d2855)',
-      tags: ['Portrait', 'Travel', 'Editorial'],
-      stats: [
-        { label: 'Album', value: '24' },
-        { label: 'Citta', value: '14' },
-        { label: 'Awards', value: '6' }
-      ]
-    }
+      kicker: '03',
+      title: 'Pubblica su slug',
+      description: 'Salva il portfolio e condividilo con un URL pulito come /marco-rinaldi.',
+      icon: 'pi pi-send',
+    },
+  ];
+  protected readonly launchMetrics = [
+    { value: '3', label: 'layout guidati' },
+    { value: '10', label: 'moduli editor' },
+    { value: '/slug', label: 'pagina pubblica' },
   ];
 
-  private cycleIntervalId: number | null = null;
-  protected readonly activeIndex = signal(0);
-  protected readonly activePortfolio = computed(() => this.portfolios[this.activeIndex()]);
-  protected readonly isAuthenticated = this.authSessionService.authenticated;
+  protected readonly portfolios = signal<UserPortfolioSummaryDto[]>([]);
+  protected readonly isLoadingPortfolios = signal(false);
+  protected readonly loadError = signal('');
+  protected readonly recentPortfolios = computed(() => this.portfolios().slice(0, 3));
+  protected readonly portfolioStats = computed(() => {
+    const portfolios = this.portfolios();
+    const publicCount = portfolios.filter((portfolio) => portfolio.public).length;
+
+    return {
+      total: portfolios.length,
+      public: publicCount,
+      private: portfolios.length - publicCount,
+    };
+  });
 
   ngOnInit() {
-    if (!isPlatformBrowser(this.platformId)) {
+    if (!isPlatformBrowser(this.platformId) || !this.isAuthenticated()) {
       return;
     }
 
-    this.cycleIntervalId = window.setInterval(() => {
-      this.activeIndex.update((currentIndex) => (currentIndex + 1) % this.portfolios.length);
-    }, 4200);
-  }
-
-  ngOnDestroy() {
-    if (isPlatformBrowser(this.platformId) && this.cycleIntervalId !== null) {
-      window.clearInterval(this.cycleIntervalId);
-    }
-  }
-
-  protected selectPortfolio(index: number) {
-    this.activeIndex.set(index);
+    this.isLoadingPortfolios.set(true);
+    this.authApiService.getMyPortfolios().subscribe({
+      next: (portfolios) => {
+        this.portfolios.set(portfolios);
+        this.loadError.set('');
+        this.isLoadingPortfolios.set(false);
+      },
+      error: () => {
+        this.loadError.set('Non sono riuscito a recuperare i portfolio in questo momento.');
+        this.isLoadingPortfolios.set(false);
+      },
+    });
   }
 }

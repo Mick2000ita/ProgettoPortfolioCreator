@@ -20,6 +20,11 @@
       <strong>Caricamento in corso...</strong>
       <p>Sto recuperando il tuo spazio portfolio.</p>
     </section>
+  } @else if (loadError()) {
+    <section class="empty-card">
+      <strong>Non sono riuscito a caricare i portfolio.</strong>
+      <p>Riprova tra poco o aggiorna la pagina.</p>
+    </section>
   } @else if (portfolios().length > 0) {
     <section class="portfolio-grid">
       @for (portfolio of portfolios(); track portfolio.id) {
@@ -45,11 +50,15 @@
                 pButton
                 type="button"
                 class="action-button"
-                icon="pi pi-eye"
+                [class.action-button-private]="!portfolio.public"
+                [icon]="portfolio.public ? 'pi pi-eye' : 'pi pi-eye-slash'"
                 [rounded]="true"
                 [text]="true"
-                aria-label="Visualizza portfolio"
-                (click)="viewPortfolio(portfolio.slug)"
+                [loading]="visibilitySlug() === portfolio.slug"
+                [attr.aria-label]="
+                  portfolio.public ? 'Rendi privato portfolio' : 'Rendi pubblico portfolio'
+                "
+                (click)="togglePortfolioVisibility(portfolio)"
               ></button>
 
               <button

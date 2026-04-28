@@ -83,7 +83,7 @@ public class PortfolioService {
         existingPortfolio.setSlug(slug);
         existingPortfolio.setPublicData(new ArrayList<>(modules));
         existingPortfolio.setWipData(new ArrayList<>(modules));
-        existingPortfolio.setPublic(true);
+        existingPortfolio.setPublic(resolveVisibility(request.getIsPublic(), existingPortfolio.isPublic()));
         existingPortfolio.setUser(user);
 
         Portfolio savedPortfolio = portfolioRepository.save(existingPortfolio);
@@ -105,6 +105,27 @@ public class PortfolioService {
                 .orElseThrow(() -> new ApplicationException("Portfolio not found",
                         "PORTFOLIO_NOT_FOUND"));
         return toPublicDto(portfolio);
+    }
+
+    public PortfolioSummaryDto updatePortfolioVisibility(String username, String slug, boolean isPublic) {
+        Portfolio portfolio = portfolioRepository.findBySlugAndUsername(slug, username)
+                .orElseThrow(() -> new ApplicationException("Portfolio not found",
+                        "PORTFOLIO_NOT_FOUND"));
+
+        User user = userRepository.findByUsername(username);
+        if (user == null) {
+            throw new ApplicationException("User not found", "USER_NOT_FOUND");
+        }
+
+        portfolio.setPublic(isPublic);
+        portfolio.setUser(user);
+        Portfolio savedPortfolio = portfolioRepository.save(portfolio);
+
+        return new PortfolioSummaryDto(
+                savedPortfolio.getId(),
+                savedPortfolio.getTitle(),
+                savedPortfolio.getSlug(),
+                savedPortfolio.isPublic());
     }
 
     @Transactional
@@ -141,6 +162,14 @@ public class PortfolioService {
         return modules.stream()
                 .filter(module -> module.get("type") != null)
                 .toList();
+    }
+
+    private boolean resolveVisibility(Boolean requestedVisibility, boolean currentVisibility) {
+        if (requestedVisibility == null) {
+            return currentVisibility;
+        }
+
+        return requestedVisibility;
     }
 
     private String generateUniqueSlug(String title, String currentSlug) {

@@ -1,86 +1,269 @@
-<div class="home-shell">
-  <section class="hero-section">
-    <div class="hero-copy">
-      <div class="eyebrow">Home</div>
-      <h1>PLACEHOLDER</h1>
-      <p>
-       Lorem ipsum dolor sit amet consectetur adipisicing elit. Molestias asperiores ipsum tempore sapiente quis, at dolores vel. Minima amet reprehenderit porro eligendi, eos consequuntur accusamus. Ex repellat facilis exercitationem nisi.
-      </p>
+<div class="home-shell" [class.home-shell-dashboard]="isAuthenticated()">
+  @if (isAuthenticated()) {
+    <section class="dashboard-hero">
+      <div class="dashboard-copy">
+        <div class="eyebrow">Launchpad</div>
+        <h1>Ciao {{ user()?.username || 'creator' }}, ripartiamo dal tuo spazio portfolio.</h1>
+        <p>
+          Qui trovi una vista rapida dei portfolio pubblicati, quelli ancora privati e le
+          scorciatoie per aprire l'editor o partire da un layout guidato.
+        </p>
 
-      <div class="hero-actions">
-        @if (!isAuthenticated()) {
-          <a routerLink="/login" class="cta-link">
-            <p-button label="Vai al login" icon="pi pi-sign-in" />
+        <div class="dashboard-actions">
+          <a routerLink="/portfolios/new" class="action-link">
+            <p-button label="Nuovo portfolio" icon="pi pi-plus-circle" />
           </a>
+          <a routerLink="/portfolios" class="action-link">
+            <p-button label="Vai ai portfolio" icon="pi pi-briefcase" [outlined]="true" />
+          </a>
+        </div>
+      </div>
+
+      <div class="dashboard-stats" aria-label="Riepilogo portfolio">
+        <article>
+          <strong>{{ portfolioStats().total }}</strong>
+          <span>totali</span>
+        </article>
+        <article>
+          <strong>{{ portfolioStats().public }}</strong>
+          <span>pubblici</span>
+        </article>
+        <article>
+          <strong>{{ portfolioStats().private }}</strong>
+          <span>privati</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="dashboard-grid">
+      <div class="dashboard-panel dashboard-panel-large">
+        <div class="panel-head">
+          <div>
+            <div class="panel-kicker">Continua</div>
+            <h2>I tuoi portfolio recenti</h2>
+          </div>
+          <a routerLink="/portfolios">Vedi tutti</a>
+        </div>
+
+        @if (isLoadingPortfolios()) {
+          <div class="state-card">
+            <strong>Caricamento in corso...</strong>
+            <p>Sto recuperando i portfolio collegati al tuo account.</p>
+          </div>
+        } @else if (loadError()) {
+          <div class="state-card state-card-error">
+            <strong>Qualcosa non ha risposto.</strong>
+            <p>{{ loadError() }}</p>
+          </div>
+        } @else if (recentPortfolios().length > 0) {
+          <div class="recent-list">
+            @for (portfolio of recentPortfolios(); track portfolio.id) {
+              <article class="recent-card">
+                <div>
+                  <span class="status-pill" [class.status-pill-public]="portfolio.public">
+                    {{ portfolio.public ? 'Pubblico' : 'Privato' }}
+                  </span>
+                  <h3>{{ portfolio.title }}</h3>
+                  <p>/{{ portfolio.slug }}</p>
+                </div>
+
+                <div class="recent-actions">
+                  <a [routerLink]="['/', portfolio.slug]" aria-label="Apri portfolio pubblico">
+                    <i class="pi pi-eye"></i>
+                  </a>
+                  <a
+                    [routerLink]="['/portfolios', portfolio.slug, 'edit']"
+                    aria-label="Modifica portfolio"
+                  >
+                    <i class="pi pi-pen-to-square"></i>
+                  </a>
+                </div>
+              </article>
+            }
+          </div>
+        } @else {
+          <div class="state-card empty-launch">
+            <strong>Non hai ancora portfolio.</strong>
+            <p>
+              Il modo piu veloce per iniziare e' scegliere un layout e completare gli slot guidati.
+            </p>
+            <a routerLink="/portfolios/new" class="action-link">
+              <p-button label="Crea il primo portfolio" icon="pi pi-sparkles" />
+            </a>
+          </div>
         }
       </div>
-    </div>
 
-    <div class="portfolio-stage">
-      <div class="stage-card" [style.background]="activePortfolio().accent">
-        <div class="stage-header">
-          <span class="stage-pill">{{ activePortfolio().discipline }}</span>
-          <span class="stage-owner">{{ activePortfolio().owner }}</span>
+      <div class="dashboard-panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-kicker">Template</div>
+            <h2>Partenze rapide</h2>
+          </div>
         </div>
 
-        <div class="stage-copy">
-          <h2>{{ activePortfolio().title }}</h2>
-          <p>{{ activePortfolio().description }}</p>
-        </div>
-
-        <div class="stage-tags">
-          @for (tag of activePortfolio().tags; track tag) {
-            <span>{{ tag }}</span>
-          }
-        </div>
-
-        <div class="stage-stats">
-          @for (stat of activePortfolio().stats; track stat.label) {
-            <div class="stat-card">
-              <strong>{{ stat.value }}</strong>
-              <span>{{ stat.label }}</span>
-            </div>
+        <div class="quick-template-list">
+          @for (layout of layoutTemplates; track layout.id) {
+            <a routerLink="/portfolios/new" class="quick-template-card">
+              <span class="template-orb" [style.background]="layout.accent"></span>
+              <div>
+                <strong>{{ layout.name }}</strong>
+                <p>{{ layout.preview }}</p>
+              </div>
+              <i class="pi pi-arrow-right"></i>
+            </a>
           }
         </div>
       </div>
-    </div>
-  </section>
+    </section>
+  } @else {
+    <section class="marketing-hero">
+      <div class="hero-copy">
+        <div class="eyebrow">Portfolio Creator</div>
+        <h1>Crea, modella e pubblica il tuo portfolio in un unico canvas.</h1>
+        <p>
+          Parti da layout guidati, compila i blocchi visivi e condividi una pagina pubblica con URL
+          pulito. Il sistema portfolio e' pronto: tu devi solo raccontare il lavoro.
+        </p>
 
-  <section class="selector-grid">
-    @for (portfolio of portfolios; track portfolio.title; let index = $index) {
-      <button
-        type="button"
-        class="selector-card"
-        [class.selector-card-active]="index === activeIndex()"
-        (click)="selectPortfolio(index)"
-      >
-        <div class="selector-accent" [style.background]="portfolio.accent"></div>
-        <div class="selector-copy">
-          <strong>{{ portfolio.title }}</strong>
-          <span>{{ portfolio.discipline }}</span>
-          <p>{{ portfolio.description }}</p>
+        <div class="hero-actions">
+          <a routerLink="/login" class="action-link">
+            <p-button label="Inizia ora" icon="pi pi-sign-in" />
+          </a>
+          <a href="#workflow" class="secondary-link">Vedi come funziona</a>
         </div>
-      </button>
-    }
-  </section>
 
-  <section class="inspiration-strip">
-    <article class="inspiration-card">
-      <span class="pi pi-images"></span>
-      <strong>Gallerie immersive</strong>
-      <p>Layout pensati per foto, visual e cover project con molto respiro.</p>
-    </article>
+        <div class="metric-row">
+          @for (metric of launchMetrics; track metric.label) {
+            <article>
+              <strong>{{ metric.value }}</strong>
+              <span>{{ metric.label }}</span>
+            </article>
+          }
+        </div>
+      </div>
 
-    <article class="inspiration-card">
-      <span class="pi pi-chart-line"></span>
-      <strong>Casi studio misurabili</strong>
-      <p>Sezioni dedicate a risultati, metriche e processo per portfolio orientati al prodotto.</p>
-    </article>
+      <div class="builder-preview" aria-label="Preview dell'editor portfolio">
+        <div class="preview-topbar">
+          <span></span>
+          <span></span>
+          <span></span>
+          <strong>/marco-rinaldi</strong>
+        </div>
 
-    <article class="inspiration-card">
-      <span class="pi pi-sparkles"></span>
-      <strong>Direzioni visive diverse</strong>
-      <p>Ogni esempio mostra un tono differente, dal minimal tecnico all’editoriale creativo.</p>
-    </article>
-  </section>
+        <div class="preview-workspace">
+          <aside class="preview-sidebar">
+            <span class="sidebar-pill">Editor</span>
+            <strong>Gerarchia</strong>
+            <div class="sidebar-node sidebar-node-active">Hero title</div>
+            <div class="sidebar-node">Stats</div>
+            <div class="sidebar-node">Carousel</div>
+            <div class="sidebar-node">CTA finale</div>
+          </aside>
+
+          <section class="preview-canvas">
+            <article class="canvas-block canvas-title">
+              <span>Frontend Engineer</span>
+              <strong>Code and Craft</strong>
+            </article>
+            <article class="canvas-block canvas-image"></article>
+            <article class="canvas-block canvas-stats">
+              <strong>42%</strong>
+              <span>Conversion uplift</span>
+            </article>
+            <article class="canvas-block canvas-copy">
+              Portfolio tecnico con casi studio, metriche e component library personale.
+            </article>
+          </section>
+
+          <aside class="preview-inspector">
+            <span class="sidebar-pill">Inspector</span>
+            <label>Colore pagina</label>
+            <div class="color-line"></div>
+            <label>Modulo</label>
+            <div class="format-row">
+              <span>B</span>
+              <span>Center</span>
+            </div>
+          </aside>
+        </div>
+
+        <div class="preview-toolbar">
+          @for (tool of editorTools.slice(0, 7); track tool.value) {
+            <span><i [class]="tool.icon"></i>{{ tool.label }}</span>
+          }
+        </div>
+      </div>
+    </section>
+
+    <section id="workflow" class="workflow-section">
+      <div class="section-heading">
+        <div class="eyebrow">Workflow</div>
+        <h2>Dal setup alla pagina pubblica, senza uscire dal prodotto.</h2>
+      </div>
+
+      <div class="workflow-grid">
+        @for (step of workflowSteps; track step.kicker) {
+          <article class="workflow-card">
+            <div class="workflow-icon">
+              <i [class]="step.icon"></i>
+            </div>
+            <span>{{ step.kicker }}</span>
+            <strong>{{ step.title }}</strong>
+            <p>{{ step.description }}</p>
+          </article>
+        }
+      </div>
+    </section>
+
+    <section class="template-section">
+      <div class="section-heading">
+        <div class="eyebrow">Layout guidati</div>
+        <h2>Tre direzioni reali, gia collegate all'editor.</h2>
+      </div>
+
+      <div class="template-grid">
+        @for (layout of layoutTemplates; track layout.id) {
+          <article class="template-card" [style.--template-accent]="layout.accent">
+            <div class="template-card-head">
+              <span>Layout</span>
+              <strong>{{ layout.name }}</strong>
+            </div>
+            <p>{{ layout.description }}</p>
+            <div class="template-preview">{{ layout.preview }}</div>
+
+            <div class="layout-miniature">
+              @for (slot of layout.slots; track slot.id) {
+                <span
+                  [style.grid-column]="
+                    slot.layout.columnStart + ' / span ' + slot.layout.columnSpan
+                  "
+                  [style.grid-row]="slot.layout.rowStart + ' / span ' + slot.layout.rowSpan"
+                ></span>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    </section>
+
+    <section class="publish-panel">
+      <div>
+        <div class="eyebrow">Pubblicazione</div>
+        <h2>La preview che salvi diventa subito una pagina condivisibile.</h2>
+        <p>
+          Il renderer pubblico usa gli stessi moduli del canvas: testi formattati, immagini,
+          carousel, tabelle, stats, CV scaricabile e CTA restano coerenti con l'editor.
+        </p>
+      </div>
+
+      <div class="slug-card">
+        <span>URL pubblico</span>
+        <strong>portfolio.app/marco-rinaldi</strong>
+        <a routerLink="/login" class="action-link">
+          <p-button label="Costruisci il tuo" icon="pi pi-arrow-right" />
+        </a>
+      </div>
+    </section>
+  }
 </div>

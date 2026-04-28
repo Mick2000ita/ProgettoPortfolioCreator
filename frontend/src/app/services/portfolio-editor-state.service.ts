@@ -1,6 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { TreeNode } from 'primeng/api';
 import {
+  PortfolioBackgroundImageDto,
   PortfolioModuleDto,
   PortfolioTextAlign,
   PortfolioTextStyleDto,
@@ -10,6 +11,7 @@ import {
 export type ContentType =
   | 'title'
   | 'description'
+  | 'code'
   | 'cv'
   | 'image'
   | 'carousel'
@@ -21,12 +23,34 @@ export type ContentType =
 export type PortfolioLayoutTemplateId = 'editorial-split' | 'case-study' | 'cv-showcase';
 
 export const DEFAULT_BACKGROUND_COLOR = '#081111';
+export const DEFAULT_BACKGROUND_IMAGE_WIDTH = 28;
+export const DEFAULT_BACKGROUND_IMAGE_BLUR = 0;
+export const DEFAULT_TABLE_BORDER_WIDTH = 1;
+const DEFAULT_CODE_LANGUAGE: CodeLanguageId = 'typescript';
 
 export interface ContentOption {
   value: ContentType;
   label: string;
   description: string;
   icon: string;
+}
+
+export type CodeLanguageId =
+  | 'plaintext'
+  | 'typescript'
+  | 'javascript'
+  | 'html'
+  | 'css'
+  | 'scss'
+  | 'json'
+  | 'bash'
+  | 'python'
+  | 'java'
+  | 'sql';
+
+export interface CodeLanguageOption {
+  value: CodeLanguageId;
+  label: string;
 }
 
 export interface EditorNodeLayout {
@@ -43,6 +67,7 @@ export interface EditorNodeTextStyle {
   verticalAlign?: PortfolioTextVerticalAlign;
   bold?: boolean;
   italic?: boolean;
+  tableBorderWidth?: number;
 }
 
 export interface PortfolioLayoutSlotDefinition {
@@ -72,12 +97,14 @@ export interface EditorNodeData {
   label: string;
   textValue: string;
   subtitle: string;
+  language: string;
   buttonLabel: string;
   url: string;
   colorValue: string;
   fileName: string;
   fileData: string;
   images: string[];
+  backgroundImages: PortfolioBackgroundImageDto[];
   textStyle: EditorNodeTextStyle;
   importSourceKey?: string;
   slotId?: string;
@@ -87,10 +114,43 @@ export interface EditorNodeData {
   layout: EditorNodeLayout;
 }
 
+export function resolveBackgroundImage(
+  image?: PortfolioBackgroundImageDto | null,
+): PortfolioBackgroundImageDto {
+  const fallbackScale = image?.scaleX ?? image?.width ?? DEFAULT_BACKGROUND_IMAGE_WIDTH;
+  const values = (image?.values ?? []).filter(Boolean);
+  const normalizedValues = values.length > 0 ? values : image?.src ? [image.src] : [];
+  const primarySrc = normalizedValues[0] ?? '';
+
+  return {
+    src: primarySrc,
+    values: normalizedValues,
+    positionX: clampBackgroundMetric(image?.positionX, -100, 200, 50),
+    positionY: clampBackgroundMetric(image?.positionY, -100, 200, 50),
+    scaleX: clampBackgroundMetric(fallbackScale, 8, 300, DEFAULT_BACKGROUND_IMAGE_WIDTH),
+    scaleY: clampBackgroundMetric(
+      image?.scaleY ?? image?.width ?? DEFAULT_BACKGROUND_IMAGE_WIDTH,
+      8,
+      300,
+      DEFAULT_BACKGROUND_IMAGE_WIDTH,
+    ),
+    blur: clampBackgroundMetric(image?.blur, 0, 40, DEFAULT_BACKGROUND_IMAGE_BLUR),
+  };
+}
+
+export function resolveBackgroundImages(
+  images?: Array<PortfolioBackgroundImageDto | null | undefined> | null,
+): PortfolioBackgroundImageDto[] {
+  return (images ?? [])
+    .map((image) => resolveBackgroundImage(image))
+    .filter((image) => Boolean(image.src || image.values?.[0]));
+}
+
 export function supportsTextFormatting(type: ContentType) {
   return (
     type === 'title' ||
     type === 'description' ||
+    type === 'code' ||
     type === 'quote' ||
     type === 'stats' ||
     type === 'table' ||
@@ -103,6 +163,8 @@ export function getDefaultTextFontSize(type: ContentType) {
   switch (type) {
     case 'title':
       return 56;
+    case 'code':
+      return 15;
     case 'quote':
       return 30;
     case 'stats':
@@ -131,6 +193,7 @@ export function getDefaultTextStyle(type: ContentType): EditorNodeTextStyle {
     verticalAlign: 'start',
     bold: type === 'title',
     italic: false,
+    tableBorderWidth: type === 'table' ? DEFAULT_TABLE_BORDER_WIDTH : undefined,
   };
 }
 
@@ -139,6 +202,15 @@ export function resolveTextStyle(
   textStyle?: EditorNodeTextStyle | PortfolioTextStyleDto | null,
 ): Required<EditorNodeTextStyle> {
   const defaultStyle = getDefaultTextStyle(type);
+  const resolvedTableBorderWidth =
+    type === 'table'
+      ? clampTextStyleMetric(
+          textStyle?.tableBorderWidth,
+          0,
+          12,
+          defaultStyle.tableBorderWidth ?? DEFAULT_TABLE_BORDER_WIDTH,
+        )
+      : DEFAULT_TABLE_BORDER_WIDTH;
 
   return {
     fontSize: textStyle?.fontSize ?? defaultStyle.fontSize ?? getDefaultTextFontSize(type),
@@ -147,7 +219,21 @@ export function resolveTextStyle(
     verticalAlign: textStyle?.verticalAlign ?? defaultStyle.verticalAlign ?? 'start',
     bold: textStyle?.bold ?? defaultStyle.bold ?? false,
     italic: textStyle?.italic ?? defaultStyle.italic ?? false,
+    tableBorderWidth: resolvedTableBorderWidth,
   };
+}
+
+function clampTextStyleMetric(
+  value: number | null | undefined,
+  min: number,
+  max: number,
+  fallback: number,
+) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return fallback;
+  }
+
+  return Math.min(Math.max(value, min), max);
 }
 
 export const PORTFOLIO_EDITOR_CONTENT_OPTIONS: ContentOption[] = [
@@ -162,6 +248,12 @@ export const PORTFOLIO_EDITOR_CONTENT_OPTIONS: ContentOption[] = [
     label: 'Descrizione',
     description: 'Testi introduttivi o blocchi editoriali.',
     icon: 'pi pi-align-left',
+  },
+  {
+    value: 'code',
+    label: 'Code',
+    description: 'Snippet di codice con linguaggio e formattazione leggibile.',
+    icon: 'pi pi-code',
   },
   {
     value: 'quote',
@@ -212,6 +304,36 @@ export const PORTFOLIO_EDITOR_CONTENT_OPTIONS: ContentOption[] = [
     icon: 'pi pi-palette',
   },
 ];
+
+export const CODE_LANGUAGE_OPTIONS: CodeLanguageOption[] = [
+  { value: 'plaintext', label: 'Plain Text' },
+  { value: 'typescript', label: 'TypeScript' },
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'html', label: 'HTML' },
+  { value: 'css', label: 'CSS' },
+  { value: 'scss', label: 'SCSS' },
+  { value: 'json', label: 'JSON' },
+  { value: 'bash', label: 'Bash' },
+  { value: 'python', label: 'Python' },
+  { value: 'java', label: 'Java' },
+  { value: 'sql', label: 'SQL' },
+];
+
+export function resolveCodeLanguage(value?: string | null): CodeLanguageId {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) {
+    return DEFAULT_CODE_LANGUAGE;
+  }
+
+  return CODE_LANGUAGE_OPTIONS.some((option) => option.value === normalized)
+    ? (normalized as CodeLanguageId)
+    : DEFAULT_CODE_LANGUAGE;
+}
+
+export function getCodeLanguageLabel(value?: string | null) {
+  const resolved = resolveCodeLanguage(value);
+  return CODE_LANGUAGE_OPTIONS.find((option) => option.value === resolved)?.label ?? 'Code';
+}
 
 export const PORTFOLIO_LAYOUT_TEMPLATES: PortfolioLayoutTemplate[] = [
   {
@@ -264,7 +386,8 @@ export const PORTFOLIO_LAYOUT_TEMPLATES: PortfolioLayoutTemplate[] = [
         id: 'editorial-cta',
         type: 'cta',
         label: 'Call to action',
-        helperText: 'Chiudi la sezione con un invito all azione verso contatto, progetto o profilo.',
+        helperText:
+          'Chiudi la sezione con un invito all azione verso contatto, progetto o profilo.',
         defaultTextValue: 'Disponibile per collaborazioni, freelance e team in fase di lancio.',
         defaultButtonLabel: 'Parliamone',
         defaultUrl: 'mailto:hello@example.com',
@@ -376,7 +499,8 @@ export const PORTFOLIO_LAYOUT_TEMPLATES: PortfolioLayoutTemplate[] = [
         type: 'cta',
         label: 'Contatto',
         helperText: 'Aggiungi disponibilita e un bottone per avviare una conversazione.',
-        defaultTextValue: 'Cerco team che vogliono costruire prodotti chiari, veloci e ben raccontati.',
+        defaultTextValue:
+          'Cerco team che vogliono costruire prodotti chiari, veloci e ben raccontati.',
         defaultButtonLabel: 'Scrivimi',
         defaultUrl: 'mailto:hello@example.com',
         layout: { columnStart: 1, rowStart: 13, columnSpan: 12, rowSpan: 3 },
@@ -429,7 +553,9 @@ export function buildPortfolioModulesFromTemplate(
       locked: true,
     };
 
-    const textStyle = supportsTextFormatting(slot.type) ? getDefaultTextStyle(slot.type) : undefined;
+    const textStyle = supportsTextFormatting(slot.type)
+      ? getDefaultTextStyle(slot.type)
+      : undefined;
 
     if (slot.type === 'image' || slot.type === 'carousel') {
       return {
@@ -592,6 +718,8 @@ export class PortfolioEditorStateService {
         return { columnStart: 1, rowStart: 1, columnSpan: 7, rowSpan: 2 };
       case 'description':
         return { columnStart: 1, rowStart: 3, columnSpan: 6, rowSpan: 3 };
+      case 'code':
+        return { columnStart: 1, rowStart: 7, columnSpan: 8, rowSpan: 5 };
       case 'image':
         return { columnStart: 1, rowStart: 1, columnSpan: 6, rowSpan: 4 };
       case 'carousel':
@@ -634,12 +762,14 @@ export class PortfolioEditorStateService {
         label,
         textValue: overrides.textValue ?? '',
         subtitle: overrides.subtitle ?? '',
+        language: type === 'code' ? resolveCodeLanguage(overrides.language) : '',
         buttonLabel: overrides.buttonLabel ?? '',
         url: overrides.url ?? '',
         colorValue: overrides.colorValue ?? DEFAULT_BACKGROUND_COLOR,
         fileName: overrides.fileName ?? '',
         fileData: overrides.fileData ?? '',
         images: [...(overrides.images ?? [])],
+        backgroundImages: resolveBackgroundImages(overrides.backgroundImages),
         textStyle: resolveTextStyle(type, overrides.textStyle),
         importSourceKey: overrides.importSourceKey,
         slotId: overrides.slotId,
@@ -690,7 +820,9 @@ export class PortfolioEditorStateService {
               ...node.data,
               label: node.data.label || this.getContentTypeLabel(type),
               images: [...node.data.images],
+              backgroundImages: resolveBackgroundImages(node.data.backgroundImages),
               subtitle: node.data.subtitle ?? '',
+              language: type === 'code' ? resolveCodeLanguage(node.data.language) : '',
               buttonLabel: node.data.buttonLabel ?? '',
               url: node.data.url ?? '',
               textStyle: resolveTextStyle(type, node.data.textStyle),
@@ -728,7 +860,9 @@ export class PortfolioEditorStateService {
         ? {
             ...node.data,
             images: [...node.data.images],
+            backgroundImages: resolveBackgroundImages(node.data.backgroundImages),
             subtitle: node.data.subtitle ?? '',
+            language: node.data.type === 'code' ? resolveCodeLanguage(node.data.language) : '',
             buttonLabel: node.data.buttonLabel ?? '',
             url: node.data.url ?? '',
             textStyle: resolveTextStyle(node.data.type, node.data.textStyle),
@@ -769,4 +903,15 @@ export class PortfolioEditorStateService {
 
     return `node-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
+}
+
+function clampBackgroundMetric(
+  value: number | undefined,
+  min: number,
+  max: number,
+  fallback: number,
+) {
+  const normalizedValue = typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+  return Math.min(max, Math.max(min, normalizedValue));
 }
