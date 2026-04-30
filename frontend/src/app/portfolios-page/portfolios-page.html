@@ -38,12 +38,44 @@
           </ng-template>
 
           <div class="portfolio-content">
-            <strong>{{ portfolio.title }}</strong>
-            <span>/{{ portfolio.slug }}</span>
-            <p>
-              Questo portfolio e' gia' associato al tuo account ed e' pronto per evolvere con
-              progetti, layout e contenuti.
-            </p>
+            <div class="portfolio-card-body">
+              <div class="portfolio-copy">
+                <strong>{{ portfolio.title }}</strong>
+                <span>/{{ portfolio.slug }}</span>
+                <p>
+                  Questo portfolio e' gia' associato al tuo account ed e' pronto per evolvere con
+                  progetti, layout e contenuti.
+                </p>
+              </div>
+
+              <div class="tag-editor">
+                <p-multiselect
+                  [ngModel]="getTagDraft(portfolio)"
+                  (ngModelChange)="updateTagDraft(portfolio.slug, $event)"
+                  [options]="portfolioTagOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  display="chip"
+                  placeholder="Tag"
+                  styleClass="portfolio-tag-select"
+                  appendTo="body"
+                  [disabled]="tagSavingSlug() === portfolio.slug"
+                />
+
+                <button
+                  pButton
+                  type="button"
+                  class="tag-save-button"
+                  icon="pi pi-check"
+                  [rounded]="true"
+                  [text]="true"
+                  [disabled]="!hasTagChanges(portfolio)"
+                  [loading]="tagSavingSlug() === portfolio.slug"
+                  aria-label="Salva tag portfolio"
+                  (click)="savePortfolioTags(portfolio)"
+                ></button>
+              </div>
+            </div>
 
             <div class="card-actions">
               <button

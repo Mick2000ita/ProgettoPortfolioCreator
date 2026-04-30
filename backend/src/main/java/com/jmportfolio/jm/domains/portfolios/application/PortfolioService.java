@@ -1,20 +1,35 @@
 package com.jmportfolio.jm.domains.portfolios.application;
 
+import java.sql.Timestamp;
 import java.text.Normalizer;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import com.jmportfolio.jm.core.exceptions.ApplicationException;
 import com.jmportfolio.jm.domains.portfolios.client.dto.CreatePortfolioRequestDto;
+import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioAnalyticsDto;
+import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioMonthlyViewsDto;
 import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioPublicDto;
+import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioSlugAvailabilityDto;
 import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioSummaryDto;
+import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioViewSummaryDto;
 import com.jmportfolio.jm.domains.portfolios.domain.models.Portfolio;
 import com.jmportfolio.jm.domains.portfolios.domain.repo.PortfolioRepository;
+import com.jmportfolio.jm.domains.portfolios.infrastructure.entities.PortfolioJpaEntity;
+import com.jmportfolio.jm.domains.portfolios.infrastructure.entities.PortfolioViewJpaEntity;
+import com.jmportfolio.jm.domains.portfolios.infrastructure.repo.PortfolioJpaRepo;
+import com.jmportfolio.jm.domains.portfolios.infrastructure.repo.PortfolioViewJpaRepo;
 import com.jmportfolio.jm.domains.projects.domain.repo.ProjectRepository;
 import com.jmportfolio.jm.domains.users.domain.models.User;
 import com.jmportfolio.jm.domains.users.domain.repo.UserRepository;
@@ -35,6 +50,12 @@ public class PortfolioService {
     @Autowired
     private ProjectRepository projectRepository;
 
+    @Autowired
+    private PortfolioJpaRepo portfolioJpaRepo;
+
+    @Autowired
+    private PortfolioViewJpaRepo portfolioViewJpaRepo;
+
     public PortfolioPublicDto createPortfolio(String username, CreatePortfolioRequestDto request) {
         User user = userRepository.findByUsername(username);
         if (user == null) {
@@ -42,13 +63,17 @@ public class PortfolioService {
         }
 
         String title = request.getTitle().trim();
-        String slug = generateUniqueSlug(title, null);
+        String slug = validateRequestedSlug(request.getSlug(), null);
+        List<String> tags = normalizeTags(request.getTags());
         List<Map<String, Object>> modules = normalizeModules(request.getModules());
 
         Portfolio portfolio = new Portfolio();
         portfolio.setTitle(title);
         portfolio.setSlug(slug);
-        portfolio.setPublic(true);
+        portfolio.setTags(tags);
+        portfolio.setShowHomeSnapshot(resolvePreference(request.getShowHomeSnapshot(), true));
+        portfolio.setShowInExplore(resolvePreference(request.getShowInExplore(), false));
+        portfolio.setPublic(resolvePreference(request.getIsPublic(), true));
         portfolio.setPublicData(new ArrayList<>(modules));
         portfolio.setWipData(new ArrayList<>(modules));
         portfolio.setUser(user);
@@ -76,14 +101,25 @@ public class PortfolioService {
         }
 
         String title = request.getTitle().trim();
-        String slug = generateUniqueSlug(title, existingPortfolio.getSlug());
+        String slug = hasText(request.getSlug())
+                ? validateRequestedSlug(request.getSlug(), existingPortfolio.getSlug())
+                : generateUniqueSlug(title, existingPortfolio.getSlug());
+        List<String> tags = request.getTags() == null
+                ? safeTags(existingPortfolio.getTags())
+                : normalizeTags(request.getTags());
         List<Map<String, Object>> modules = normalizeModules(request.getModules());
 
         existingPortfolio.setTitle(title);
         existingPortfolio.setSlug(slug);
+        existingPortfolio.setTags(tags);
         existingPortfolio.setPublicData(new ArrayList<>(modules));
         existingPortfolio.setWipData(new ArrayList<>(modules));
-        existingPortfolio.setPublic(resolveVisibility(request.getIsPublic(), existingPortfolio.isPublic()));
+        existingPortfolio.setShowHomeSnapshot(
+                resolvePreference(request.getShowHomeSnapshot(),
+                        existingPortfolio.isShowHomeSnapshot()));
+        existingPortfolio.setShowInExplore(
+                resolvePreference(request.getShowInExplore(), existingPortfolio.isShowInExplore()));
+        existingPortfolio.setPublic(resolvePreference(request.getIsPublic(), existingPortfolio.isPublic()));
         existingPortfolio.setUser(user);
 
         Portfolio savedPortfolio = portfolioRepository.save(existingPortfolio);
@@ -96,8 +132,83 @@ public class PortfolioService {
                         portfolio.getId(),
                         portfolio.getTitle(),
                         portfolio.getSlug(),
-                        portfolio.isPublic()))
+                        safeTags(portfolio.getTags()),
+                        portfolio.isPublic(),
+                        portfolio.isShowHomeSnapshot(),
+                        portfolio.isShowInExplore()))
                 .toList();
+    }
+
+    public PortfolioAnalyticsDto getUserPortfolioAnalytics(String username) {
+        LocalDate currentMonthStart = LocalDate.now(ZoneOffset.UTC).withDayOfMonth(1);
+        LocalDate previousMonthStart = currentMonthStart.minusMonths(1);
+        LocalDate trendStart = currentMonthStart.minusMonths(5);
+
+        Timestamp currentMonthTimestamp = toTimestamp(currentMonthStart);
+        Timestamp previousMonthTimestamp = toTimestamp(previousMonthStart);
+        Timestamp trendStartTimestamp = toTimestamp(trendStart);
+
+        long totalViews = portfolioViewJpaRepo.countByPortfolio_UserJpaEntity_Username(username);
+        long monthlyViews = portfolioViewJpaRepo
+                .countByPortfolio_UserJpaEntity_UsernameAndCreatedGreaterThanEqual(username,
+                        currentMonthTimestamp);
+        long previousMonthViews = portfolioViewJpaRepo
+                .countByPortfolio_UserJpaEntity_UsernameAndCreatedGreaterThanEqualAndCreatedLessThan(
+                        username,
+                        previousMonthTimestamp,
+                        currentMonthTimestamp);
+
+        Map<UUID, Long> totalViewsByPortfolio = toPortfolioCountMap(
+                portfolioViewJpaRepo.countViewsByPortfolio(username));
+        Map<UUID, Long> monthlyViewsByPortfolio = toPortfolioCountMap(
+                portfolioViewJpaRepo.countViewsByPortfolioFrom(username, currentMonthTimestamp));
+        Map<String, Long> viewsByMonth = portfolioViewJpaRepo
+                .countViewsByMonthFrom(username, trendStartTimestamp).stream()
+                .collect(Collectors.toMap(
+                        row -> (String) row[0],
+                        row -> ((Number) row[1]).longValue()));
+
+        List<PortfolioMonthlyViewsDto> monthlyTrend = new ArrayList<>();
+        DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("MMM", Locale.ITALIAN);
+        for (int i = 0; i < 6; i++) {
+            LocalDate month = trendStart.plusMonths(i);
+            String monthKey = month.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            String label = month.format(monthFormatter);
+            monthlyTrend.add(new PortfolioMonthlyViewsDto(
+                    monthKey,
+                    label,
+                    viewsByMonth.getOrDefault(monthKey, 0L)));
+        }
+
+        List<PortfolioViewSummaryDto> portfolioViews = portfolioJpaRepo
+                .findAllByUserJpaEntityUsernameOrderByCreatedDesc(username).stream()
+                .map(portfolio -> new PortfolioViewSummaryDto(
+                        portfolio.getId(),
+                        portfolio.getTitle(),
+                        portfolio.getSlug(),
+                        safeTags(portfolio.getTags()),
+                        portfolio.isPublic(),
+                        portfolio.isShowHomeSnapshot(),
+                        portfolio.isShowInExplore(),
+                        totalViewsByPortfolio.getOrDefault(portfolio.getId(), 0L),
+                        monthlyViewsByPortfolio.getOrDefault(portfolio.getId(), 0L)))
+                .toList();
+
+        return new PortfolioAnalyticsDto(
+                totalViews,
+                monthlyViews,
+                previousMonthViews,
+                monthlyTrend,
+                portfolioViews);
+    }
+
+    public PortfolioSlugAvailabilityDto checkSlugAvailability(String requestedSlug) {
+        String slug = normalizeSlug(requestedSlug);
+        boolean available = hasText(slug)
+                && !RESERVED_SLUGS.contains(slug)
+                && !portfolioRepository.existsBySlug(slug);
+
+        return new PortfolioSlugAvailabilityDto(slug, available);
     }
 
     public PortfolioPublicDto getPublicPortfolioBySlug(String slug) {
@@ -105,6 +216,13 @@ public class PortfolioService {
                 .orElseThrow(() -> new ApplicationException("Portfolio not found",
                         "PORTFOLIO_NOT_FOUND"));
         return toPublicDto(portfolio);
+    }
+
+    public void trackPublicPortfolioView(String slug) {
+        Portfolio portfolio = portfolioRepository.findPublicBySlug(slug)
+                .orElseThrow(() -> new ApplicationException("Portfolio not found",
+                        "PORTFOLIO_NOT_FOUND"));
+        trackPortfolioView(portfolio.getId());
     }
 
     public PortfolioSummaryDto updatePortfolioVisibility(String username, String slug, boolean isPublic) {
@@ -125,7 +243,34 @@ public class PortfolioService {
                 savedPortfolio.getId(),
                 savedPortfolio.getTitle(),
                 savedPortfolio.getSlug(),
-                savedPortfolio.isPublic());
+                safeTags(savedPortfolio.getTags()),
+                savedPortfolio.isPublic(),
+                savedPortfolio.isShowHomeSnapshot(),
+                savedPortfolio.isShowInExplore());
+    }
+
+    public PortfolioSummaryDto updatePortfolioTags(String username, String slug, List<String> tags) {
+        Portfolio portfolio = portfolioRepository.findBySlugAndUsername(slug, username)
+                .orElseThrow(() -> new ApplicationException("Portfolio not found",
+                        "PORTFOLIO_NOT_FOUND"));
+
+        User user = userRepository.findByUsername(username);
+        if (user == null) {
+            throw new ApplicationException("User not found", "USER_NOT_FOUND");
+        }
+
+        portfolio.setTags(normalizeTags(tags));
+        portfolio.setUser(user);
+        Portfolio savedPortfolio = portfolioRepository.save(portfolio);
+
+        return new PortfolioSummaryDto(
+                savedPortfolio.getId(),
+                savedPortfolio.getTitle(),
+                savedPortfolio.getSlug(),
+                safeTags(savedPortfolio.getTags()),
+                savedPortfolio.isPublic(),
+                savedPortfolio.isShowHomeSnapshot(),
+                savedPortfolio.isShowInExplore());
     }
 
     @Transactional
@@ -150,8 +295,28 @@ public class PortfolioService {
                 portfolio.getId(),
                 portfolio.getTitle(),
                 portfolio.getSlug(),
+                safeTags(portfolio.getTags()),
                 portfolio.isPublic(),
+                portfolio.isShowHomeSnapshot(),
+                portfolio.isShowInExplore(),
                 modules);
+    }
+
+    private List<String> normalizeTags(List<String> tags) {
+        if (tags == null) {
+            return List.of();
+        }
+
+        return tags.stream()
+                .filter(this::hasText)
+                .map(String::trim)
+                .distinct()
+                .limit(12)
+                .toList();
+    }
+
+    private List<String> safeTags(List<String> tags) {
+        return tags == null ? List.of() : tags;
     }
 
     private List<Map<String, Object>> normalizeModules(List<Map<String, Object>> modules) {
@@ -164,12 +329,53 @@ public class PortfolioService {
                 .toList();
     }
 
-    private boolean resolveVisibility(Boolean requestedVisibility, boolean currentVisibility) {
-        if (requestedVisibility == null) {
-            return currentVisibility;
+    private boolean resolvePreference(Boolean requestedPreference, boolean currentPreference) {
+        if (requestedPreference == null) {
+            return currentPreference;
         }
 
-        return requestedVisibility;
+        return requestedPreference;
+    }
+
+    private void trackPortfolioView(UUID portfolioId) {
+        PortfolioJpaEntity portfolio = portfolioJpaRepo.findById(portfolioId)
+                .orElseThrow(() -> new ApplicationException("Portfolio not found",
+                        "PORTFOLIO_NOT_FOUND"));
+
+        PortfolioViewJpaEntity view = new PortfolioViewJpaEntity();
+        view.setPortfolio(portfolio);
+        portfolioViewJpaRepo.save(view);
+    }
+
+    private Timestamp toTimestamp(LocalDate date) {
+        return Timestamp.from(date.atStartOfDay().toInstant(ZoneOffset.UTC));
+    }
+
+    private Map<UUID, Long> toPortfolioCountMap(List<Object[]> rows) {
+        return rows.stream()
+                .collect(Collectors.toMap(
+                        row -> (UUID) row[0],
+                        row -> ((Number) row[1]).longValue()));
+    }
+
+    private String validateRequestedSlug(String requestedSlug, String currentSlug) {
+        String slug = normalizeSlug(requestedSlug);
+        if (!hasText(slug)) {
+            throw new ApplicationException("Lo slug del portfolio e obbligatorio",
+                    "PORTFOLIO_SLUG_REQUIRED", HttpStatus.BAD_REQUEST);
+        }
+
+        if (RESERVED_SLUGS.contains(slug)) {
+            throw new ApplicationException("Questo slug e riservato",
+                    "PORTFOLIO_SLUG_RESERVED", HttpStatus.BAD_REQUEST);
+        }
+
+        if (!slug.equals(currentSlug) && portfolioRepository.existsBySlug(slug)) {
+            throw new ApplicationException("Esiste gia un portfolio con questo slug",
+                    "PORTFOLIO_SLUG_ALREADY_EXISTS", HttpStatus.CONFLICT);
+        }
+
+        return slug;
     }
 
     private String generateUniqueSlug(String title, String currentSlug) {
@@ -194,6 +400,14 @@ public class PortfolioService {
             suffix++;
         }
         return candidate;
+    }
+
+    private String normalizeSlug(String input) {
+        return slugify(input == null ? "" : input);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isBlank();
     }
 
     private String slugify(String input) {

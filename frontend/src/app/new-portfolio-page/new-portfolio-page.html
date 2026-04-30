@@ -1,149 +1,344 @@
 <div class="new-portfolio-shell">
   <section class="intro-card">
-    <div class="eyebrow">Step 1</div>
-    <h1>Imposta il setup iniziale del tuo portfolio.</h1>
-    <p>
-      In questo step scegli nome, URL e il layout di partenza. Dopo la creazione entrerai in un
-      editor guidato: potrai caricare immagini, scrivere testi e compilare solo le sezioni previste
-      dal layout selezionato. L'URL finale conterra' solo il nome scelto, ad esempio
-      <code>/{{ slugPreview() || 'nome-portfolio' }}</code
-      >.
-    </p>
+    <div class="intro-head">
+      <div>
+        <div class="eyebrow">Nuovo portfolio</div>
+        <h1>Crea il setup iniziale.</h1>
+      </div>
+      <div class="progress-readout">
+        <span>Step {{ activeStepIndex() + 1 }} di {{ wizardSteps.length }}</span>
+        <strong>{{ currentStep().title }}</strong>
+      </div>
+    </div>
+
+    <div class="wizard-progress" aria-hidden="true">
+      <span [style.width.%]="progressValue()"></span>
+    </div>
+
+    <p-timeline
+      [value]="wizardSteps"
+      layout="horizontal"
+      align="top"
+      styleClass="portfolio-timeline"
+    >
+      <ng-template pTemplate="marker" let-step>
+        <button
+          type="button"
+          class="timeline-marker"
+          [class.timeline-marker-active]="stepState(step.index) === 'active'"
+          [class.timeline-marker-completed]="stepState(step.index) === 'completed'"
+          [disabled]="step.index > activeStepIndex()"
+          (click)="goToStep(step.index)"
+        >
+          @if (stepState(step.index) === 'completed') {
+            <i class="pi pi-check"></i>
+          } @else {
+            <span>{{ step.index + 1 }}</span>
+          }
+        </button>
+      </ng-template>
+
+      <ng-template pTemplate="content" let-step>
+        <button
+          type="button"
+          class="timeline-content"
+          [class.timeline-content-active]="stepState(step.index) === 'active'"
+          [disabled]="step.index > activeStepIndex()"
+          (click)="goToStep(step.index)"
+        >
+          <strong>{{ step.title }}</strong>
+          <span>{{ step.subtitle }}</span>
+        </button>
+      </ng-template>
+    </p-timeline>
 
     <form class="portfolio-form" [formGroup]="portfolioForm" (ngSubmit)="submit()">
-      <div class="form-section">
-        <h2>1. Identita' del portfolio</h2>
-
-        <label class="field-block">
-          <span>Nome del portfolio</span>
-          <input pInputText formControlName="title" placeholder="Es. marco-rinaldi" />
-        </label>
-
-        <div class="slug-preview">
-          URL condivisibile:
-          <strong>/{{ slugPreview() || 'nome-portfolio' }}</strong>
-        </div>
-      </div>
-
-      <div class="form-section">
-        <div class="section-head">
-          <div>
-            <h2>2. Scegli un layout</h2>
-            <p class="section-copy">
-              Puoi partire da un layout guidato oppure continuare senza layout per aprire l'editor
-              normale e costruire il portfolio liberamente.
-            </p>
+      @if (activeStepIndex() === 0) {
+        <section class="form-section step-panel">
+          <div class="section-head">
+            <div>
+              <span class="content-type">Identita</span>
+              <h2>Nome e URL pubblico</h2>
+            </div>
           </div>
 
-          @if (selectedLayout(); as activeLayout) {
-            <div class="selected-layout-chip">
-              <span>Layout attivo</span>
-              <strong>{{ activeLayout.name }}</strong>
-            </div>
-          } @else {
-            <div class="selected-layout-chip">
-              <span>Modalita' attiva</span>
-              <strong>Editor libero</strong>
+          <label class="field-block">
+            <span>Nome del portfolio</span>
+            <input pInputText formControlName="title" placeholder="Es. Marco Rinaldi" />
+          </label>
+
+          @if (
+            portfolioForm.controls.title.hasError('required') &&
+            portfolioForm.controls.title.touched
+          ) {
+            <div class="helper-box helper-box-error">Inserisci il nome del portfolio.</div>
+          }
+
+          <label class="field-block">
+            <span>Slug</span>
+            <input
+              pInputText
+              formControlName="slug"
+              placeholder="marco-rinaldi"
+              (input)="onSlugInput()"
+            />
+          </label>
+
+          <div
+            class="slug-preview"
+            [class.slug-preview-success]="slugStatus() === 'available'"
+            [class.slug-preview-error]="slugStatus() === 'taken' || slugStatus() === 'invalid'"
+          >
+            URL condivisibile:
+            <strong>/{{ slugPreview() || 'nome-portfolio' }}</strong>
+            @if (slugStatus() === 'checking') {
+              <span>Verifica in corso...</span>
+            } @else if (slugStatus() === 'available') {
+              <span>Disponibile</span>
+            }
+          </div>
+
+          @if (slugError(); as errorMessage) {
+            <div class="helper-box helper-box-error">{{ errorMessage }}</div>
+          } @else if (
+            portfolioForm.controls.slug.hasError('required') &&
+            portfolioForm.controls.slug.touched
+          ) {
+            <div class="helper-box helper-box-error">Lo slug e obbligatorio.</div>
+          } @else if (
+            portfolioForm.controls.slug.hasError('pattern') &&
+            portfolioForm.controls.slug.touched
+          ) {
+            <div class="helper-box helper-box-error">
+              Usa solo lettere minuscole, numeri e trattini.
             </div>
           }
-        </div>
 
-        <div class="layout-grid">
-          <button
-            type="button"
-            class="layout-card layout-card-free"
-            [class.layout-card-active]="selectedLayoutId() === null"
-            (click)="continueWithoutLayout()"
-          >
-            <div class="layout-card-head">
-              <span class="layout-card-kicker">Libero</span>
-              <strong>Nessun layout</strong>
+          <label class="field-block">
+            <span>Tag</span>
+            <p-multiselect
+              formControlName="tags"
+              [options]="portfolioTagOptions"
+              optionLabel="label"
+              optionValue="value"
+              display="chip"
+              placeholder="Programmatore, 3D Artist..."
+              styleClass="portfolio-tag-select"
+              appendTo="body"
+            />
+          </label>
+        </section>
+      }
+
+      @if (activeStepIndex() === 1) {
+        <section class="form-section step-panel">
+          <div class="section-head">
+            <div>
+              <span class="content-type">Layout</span>
+              <h2>Scegli una struttura</h2>
+              <p class="section-copy">
+                Puoi partire da un layout guidato oppure aprire l'editor libero.
+              </p>
             </div>
 
-            <p>
-              Entra nell'editor normale con canvas vuoto, aggiungi moduli, spostali e costruisci la
-              pagina senza vincoli iniziali.
-            </p>
+            @if (selectedLayout(); as activeLayout) {
+              <div class="selected-layout-chip">
+                <span>Layout attivo</span>
+                <strong>{{ activeLayout.name }}</strong>
+              </div>
+            } @else {
+              <div class="selected-layout-chip">
+                <span>Modalita attiva</span>
+                <strong>Editor libero</strong>
+              </div>
+            }
+          </div>
 
-            <div class="layout-preview-copy">Editor standard con blocchi liberi</div>
-
-            <div class="layout-miniature layout-miniature-free">
-              <span class="layout-miniature-slot layout-miniature-slot-wide"></span>
-              <span class="layout-miniature-slot"></span>
-              <span class="layout-miniature-slot"></span>
-              <span class="layout-miniature-slot layout-miniature-slot-tall"></span>
-              <span class="layout-miniature-slot"></span>
-            </div>
-          </button>
-
-          @for (layout of layoutTemplates; track trackTemplate($index)) {
+          <div class="layout-grid">
             <button
               type="button"
-              class="layout-card"
-              [class.layout-card-active]="selectedLayoutId() === layout.id"
-              [style.--layout-accent]="layout.accent"
-              (click)="selectLayout(layout.id)"
+              class="layout-card layout-card-free"
+              [class.layout-card-active]="selectedLayoutId() === null"
+              (click)="continueWithoutLayout()"
             >
               <div class="layout-card-head">
-                <span class="layout-card-kicker">Layout</span>
-                <strong>{{ layout.name }}</strong>
+                <span class="layout-card-kicker">Libero</span>
+                <strong>Nessun layout</strong>
               </div>
 
-              <p>{{ layout.description }}</p>
+              <p>
+                Entra nell'editor normale con canvas vuoto, aggiungi moduli e costruisci la pagina
+                senza vincoli iniziali.
+              </p>
 
-              <div class="layout-preview-copy">{{ layout.preview }}</div>
+              <div class="layout-preview-copy">Editor standard con blocchi liberi</div>
 
-              <div class="layout-miniature">
-                @for (slot of layout.slots; track slot.id) {
-                  <span
-                    class="layout-miniature-slot"
-                    [style.grid-column]="
-                      slot.layout.columnStart + ' / span ' + slot.layout.columnSpan
-                    "
-                    [style.grid-row]="slot.layout.rowStart + ' / span ' + slot.layout.rowSpan"
-                  ></span>
-                }
+              <div class="layout-miniature layout-miniature-free">
+                <span class="layout-miniature-slot layout-miniature-slot-wide"></span>
+                <span class="layout-miniature-slot"></span>
+                <span class="layout-miniature-slot"></span>
+                <span class="layout-miniature-slot layout-miniature-slot-tall"></span>
+                <span class="layout-miniature-slot"></span>
               </div>
             </button>
-          }
-        </div>
-      </div>
 
-      @if (selectedLayout(); as activeLayout) {
-        <section class="form-section layout-summary">
-          <div class="summary-head">
-            <div>
-              <span class="content-type">Preview editor</span>
-              <h3>{{ activeLayout.name }}</h3>
-            </div>
-            <div class="summary-accent" [style.background]="activeLayout.accent"></div>
-          </div>
+            @for (layout of layoutTemplates; track trackTemplate($index)) {
+              <button
+                type="button"
+                class="layout-card"
+                [class.layout-card-active]="selectedLayoutId() === layout.id"
+                [style.--layout-accent]="layout.accent"
+                (click)="selectLayout(layout.id)"
+              >
+                <div class="layout-card-head">
+                  <span class="layout-card-kicker">Layout</span>
+                  <strong>{{ layout.name }}</strong>
+                </div>
 
-          <p>{{ activeLayout.description }}</p>
+                <p>{{ layout.description }}</p>
 
-          <div class="summary-slots">
-            @for (slot of activeLayout.slots; track slot.id) {
-              <article class="summary-slot">
-                <strong>{{ slot.label }}</strong>
-                <span>{{ slot.helperText }}</span>
-              </article>
+                <div class="layout-preview-copy">{{ layout.preview }}</div>
+
+                <div class="layout-miniature">
+                  @for (slot of layout.slots; track slot.id) {
+                    <span
+                      class="layout-miniature-slot"
+                      [style.grid-column]="
+                        slot.layout.columnStart + ' / span ' + slot.layout.columnSpan
+                      "
+                      [style.grid-row]="slot.layout.rowStart + ' / span ' + slot.layout.rowSpan"
+                    ></span>
+                  }
+                </div>
+              </button>
             }
           </div>
         </section>
-      } @else {
-        <section class="form-section layout-summary">
-          <div class="summary-head">
+      }
+
+      @if (activeStepIndex() === 2) {
+        <section class="form-section step-panel visibility-panel">
+          <div class="section-head">
             <div>
-              <span class="content-type">Preview editor</span>
-              <h3>Editor libero</h3>
+              <span class="content-type">Visibilita</span>
+              <h2>Dove parte il portfolio</h2>
+              <p class="section-copy">
+                Puoi cambiare queste preferenze anche piu avanti, quando collegherai Home ed
+                Esplora.
+              </p>
             </div>
-            <div class="summary-accent summary-accent-free"></div>
           </div>
 
-          <p>
-            Il portfolio verra' creato vuoto e si aprira' l'editor normale. Potrai aggiungere nuovi
-            blocchi, spostarli, ridimensionarli e costruire la struttura da zero.
-          </p>
+          <div class="visibility-options">
+            <label class="checkbox-option">
+              <input type="checkbox" formControlName="showHomeSnapshot" />
+              <span class="checkbox-copy">
+                <strong>Mostra uno snap nella Home</strong>
+                <small>La Home potra usare un'anteprima del portfolio appena creato.</small>
+              </span>
+            </label>
+
+            <label class="checkbox-option">
+              <input type="checkbox" formControlName="showInExplore" />
+              <span class="checkbox-copy">
+                <strong>Compari nella sezione Esplora</strong>
+                <small>Quando la sezione sara pronta, questo portfolio potra essere incluso.</small>
+              </span>
+            </label>
+
+            <label class="checkbox-option">
+              <input type="checkbox" formControlName="public" />
+              <span class="checkbox-copy">
+                <strong>Parti come portfolio pubblico</strong>
+                <small>Se disattivi questa opzione, il portfolio nasce privato.</small>
+              </span>
+            </label>
+          </div>
+        </section>
+      }
+
+      @if (activeStepIndex() === 3) {
+        <section class="form-section step-panel layout-summary">
+          <div class="summary-head">
+            <div>
+              <span class="content-type">Riepilogo</span>
+              <h2>{{ portfolioForm.controls.title.value || 'Nuovo portfolio' }}</h2>
+              <div class="slug-preview">
+                URL condivisibile:
+                <strong>/{{ slugPreview() || 'nome-portfolio' }}</strong>
+              </div>
+            </div>
+
+            @if (selectedLayout(); as activeLayout) {
+              <div class="summary-accent" [style.background]="activeLayout.accent"></div>
+            } @else {
+              <div class="summary-accent summary-accent-free"></div>
+            }
+          </div>
+
+          @if (selectedLayout(); as activeLayout) {
+            <p>{{ activeLayout.description }}</p>
+
+            <div class="summary-slots">
+              @for (slot of activeLayout.slots; track slot.id) {
+                <article class="summary-slot">
+                  <strong>{{ slot.label }}</strong>
+                  <span>{{ slot.helperText }}</span>
+                </article>
+              }
+            </div>
+          } @else {
+            <p>
+              Il portfolio verra creato vuoto e si aprira l'editor normale. Potrai aggiungere
+              moduli, spostarli e costruire la struttura da zero.
+            </p>
+          }
+
+          <div class="summary-preferences">
+            <article>
+              <strong>Tag</strong>
+              <span>
+                {{
+                  portfolioForm.controls.tags.value.length > 0
+                    ? portfolioForm.controls.tags.value.join(', ')
+                    : 'Nessun tag selezionato'
+                }}
+              </span>
+            </article>
+
+            <article>
+              <strong>Home</strong>
+              <span>
+                {{
+                  portfolioForm.controls.showHomeSnapshot.value
+                    ? 'Snap visibile nella Home'
+                    : 'Snap nascosto dalla Home'
+                }}
+              </span>
+            </article>
+
+            <article>
+              <strong>Esplora</strong>
+              <span>
+                {{
+                  portfolioForm.controls.showInExplore.value
+                    ? 'Disponibile per Esplora'
+                    : 'Non incluso in Esplora'
+                }}
+              </span>
+            </article>
+
+            <article>
+              <strong>Privacy</strong>
+              <span>
+                {{
+                  portfolioForm.controls.public.value
+                    ? 'Portfolio pubblico'
+                    : 'Portfolio privato'
+                }}
+              </span>
+            </article>
+          </div>
         </section>
       }
 
@@ -152,12 +347,35 @@
           <p-button label="Torna ai portfolio" icon="pi pi-arrow-left" [outlined]="true" />
         </a>
 
-        <p-button
-          type="submit"
-          label="Crea portfolio"
-          icon="pi pi-arrow-right"
-          [loading]="isSubmitting()"
-        />
+        <div class="step-actions">
+          @if (activeStepIndex() > 0) {
+            <p-button
+              type="button"
+              label="Indietro"
+              icon="pi pi-arrow-left"
+              [outlined]="true"
+              (onClick)="previousStep()"
+            />
+          }
+
+          @if (activeStepIndex() < wizardSteps.length - 1) {
+            <p-button
+              type="button"
+              label="Continua"
+              icon="pi pi-arrow-right"
+              iconPos="right"
+              [loading]="slugStatus() === 'checking' && activeStepIndex() === 0"
+              (onClick)="nextStep()"
+            />
+          } @else {
+            <p-button
+              type="submit"
+              label="Crea portfolio"
+              icon="pi pi-check"
+              [loading]="isSubmitting()"
+            />
+          }
+        </div>
       </div>
     </form>
   </section>

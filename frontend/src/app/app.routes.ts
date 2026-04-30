@@ -1,62 +1,75 @@
 import { Routes } from '@angular/router';
-import { AuthenticatedLayout } from './authenticated-layout/authenticated-layout';
 import { authGuard, guestGuard } from './guards/auth.guards';
-import { HomePage } from './home-page/home-page';
-import { LoginPage } from './login-page/login-page';
-import { NewPortfolioPage } from './new-portfolio-page/new-portfolio-page';
-import { PortfolioEditorPage } from './portfolio-editor-page/portfolio-editor-page';
-import { PortfoliosPage } from './portfolios-page/portfolios-page';
-import { ProfilePage } from './profile-page/profile-page';
-import { PublicPortfolioPage } from './public-portfolio-page/public-portfolio-page';
 
 export const routes: Routes = [
   {
     path: '',
-    component: HomePage,
+    loadComponent: () => import('./home-page/home-page').then((module) => module.HomePage),
     canActivate: [guestGuard]
   },
   {
     path: 'login',
-    component: LoginPage,
+    loadComponent: () => import('./login-page/login-page').then((module) => module.LoginPage),
     canActivate: [guestGuard]
   },
   {
+    path: 'privacy',
+    loadComponent: () => import('./privacy-page/privacy-page').then((module) => module.PrivacyPage)
+  },
+  {
     path: 'home',
-    component: AuthenticatedLayout,
+    loadComponent: () =>
+      import('./authenticated-layout/authenticated-layout').then(
+        (module) => module.AuthenticatedLayout,
+      ),
     canActivate: [authGuard],
     children: [
       {
         path: '',
-        component: HomePage
+        loadComponent: () => import('./home-page/home-page').then((module) => module.HomePage)
       }
     ]
   },
   {
     path: '',
-    component: AuthenticatedLayout,
+    loadComponent: () =>
+      import('./authenticated-layout/authenticated-layout').then(
+        (module) => module.AuthenticatedLayout,
+      ),
     canActivate: [authGuard],
     children: [
       {
         path: 'profile',
-        component: ProfilePage
+        loadComponent: () =>
+          import('./profile-page/profile-page').then((module) => module.ProfilePage)
       },
       {
         path: 'portfolios',
-        component: PortfoliosPage
+        loadComponent: () =>
+          import('./portfolios-page/portfolios-page').then((module) => module.PortfoliosPage)
       },
       {
         path: 'portfolios/new',
-        component: NewPortfolioPage
+        loadComponent: () =>
+          import('./new-portfolio-page/new-portfolio-page').then(
+            (module) => module.NewPortfolioPage,
+          )
       },
       {
         path: 'portfolios/:slug/edit',
-        component: PortfolioEditorPage
+        loadComponent: () =>
+          import('./portfolio-editor-page/portfolio-editor-page').then(
+            (module) => module.PortfolioEditorPage,
+          )
       }
     ]
   },
   {
     path: ':slug',
-    component: PublicPortfolioPage
+    loadComponent: () =>
+      import('./public-portfolio-page/public-portfolio-page').then(
+        (module) => module.PublicPortfolioPage,
+      )
   },
   {
     path: '**',

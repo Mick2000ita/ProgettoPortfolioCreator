@@ -32,11 +32,44 @@ export interface RegisterRequestDto {
   password: string;
 }
 
+export interface UpdateUserProfileRequestDto {
+  email?: string;
+  avatarUrl?: string | null;
+  currentPassword?: string;
+  newPassword?: string;
+}
+
+export interface UpdatePortfolioTagsRequestDto {
+  tags: string[];
+}
+
 export interface UserPortfolioSummaryDto {
   id: string;
   title: string;
   slug: string;
+  tags: string[];
   public: boolean;
+  showHomeSnapshot?: boolean;
+  showInExplore?: boolean;
+}
+
+export interface PortfolioViewSummaryDto extends UserPortfolioSummaryDto {
+  totalViews: number;
+  monthlyViews: number;
+}
+
+export interface PortfolioMonthlyViewsDto {
+  month: string;
+  label: string;
+  views: number;
+}
+
+export interface PortfolioAnalyticsDto {
+  totalViews: number;
+  monthlyViews: number;
+  previousMonthViews: number;
+  monthlyTrend: PortfolioMonthlyViewsDto[];
+  portfolioViews: PortfolioViewSummaryDto[];
 }
 
 export type PortfolioTextAlign = 'left' | 'center' | 'right';
@@ -50,6 +83,9 @@ export interface PortfolioTextStyleDto {
   bold?: boolean;
   italic?: boolean;
   tableBorderWidth?: number;
+  tableBorderColor?: string;
+  tableCellBackgroundColor?: string;
+  tableHeaderBackgroundColor?: string;
 }
 
 export interface PortfolioBackgroundImageDto {
@@ -91,15 +127,27 @@ export interface PortfolioModuleDto {
 
 export interface CreatePortfolioRequestDto {
   title: string;
+  slug?: string;
+  tags?: string[];
   modules: PortfolioModuleDto[];
+  showHomeSnapshot?: boolean;
+  showInExplore?: boolean;
   public?: boolean;
+}
+
+export interface PortfolioSlugAvailabilityDto {
+  slug: string;
+  available: boolean;
 }
 
 export interface PortfolioPublicDto {
   id: string;
   title: string;
   slug: string;
+  tags: string[];
   public: boolean;
+  showHomeSnapshot?: boolean;
+  showInExplore?: boolean;
   modules: PortfolioModuleDto[];
 }
 
@@ -144,8 +192,16 @@ export class AuthApiService {
     return this.http.get<UserProfileDto>(`${this.apiUrl}/api/user/me`);
   }
 
+  updateCurrentUserProfile(payload: UpdateUserProfileRequestDto): Observable<UserProfileDto> {
+    return this.http.put<UserProfileDto>(`${this.apiUrl}/api/user/me`, payload);
+  }
+
   getMyPortfolios(): Observable<UserPortfolioSummaryDto[]> {
     return this.http.get<UserPortfolioSummaryDto[]>(`${this.apiUrl}/api/portfolios/me`);
+  }
+
+  getMyPortfolioAnalytics(): Observable<PortfolioAnalyticsDto> {
+    return this.http.get<PortfolioAnalyticsDto>(`${this.apiUrl}/api/portfolios/me/analytics`);
   }
 
   getMyPortfolio(slug: string): Observable<PortfolioPublicDto> {
@@ -154,6 +210,15 @@ export class AuthApiService {
 
   createPortfolio(payload: CreatePortfolioRequestDto): Observable<PortfolioPublicDto> {
     return this.http.post<PortfolioPublicDto>(`${this.apiUrl}/api/portfolios`, payload);
+  }
+
+  checkPortfolioSlug(slug: string): Observable<PortfolioSlugAvailabilityDto> {
+    return this.http.get<PortfolioSlugAvailabilityDto>(
+      `${this.apiUrl}/api/portfolios/slug-availability`,
+      {
+        params: { slug },
+      },
+    );
   }
 
   updatePortfolio(
@@ -172,11 +237,25 @@ export class AuthApiService {
     );
   }
 
+  updatePortfolioTags(
+    slug: string,
+    payload: UpdatePortfolioTagsRequestDto,
+  ): Observable<UserPortfolioSummaryDto> {
+    return this.http.put<UserPortfolioSummaryDto>(
+      `${this.apiUrl}/api/portfolios/${slug}/tags`,
+      payload,
+    );
+  }
+
   deletePortfolio(slug: string): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/api/portfolios/${slug}`);
   }
 
   getPublicPortfolio(slug: string): Observable<PortfolioPublicDto> {
     return this.http.get<PortfolioPublicDto>(`${this.apiUrl}/api/portfolios/public/${slug}`);
+  }
+
+  recordPublicPortfolioView(slug: string): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/api/portfolios/public/${slug}/views`, {});
   }
 }

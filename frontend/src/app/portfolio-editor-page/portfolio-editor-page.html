@@ -48,7 +48,7 @@
                   <strong>Canvas vuoto.</strong>
                   <p>
                     Trascina moduli moderni come titolo, immagine, carousel, quote, stats, CTA,
-                    tabella o CV dalla toolbar in basso.
+                    share o tabella dalla toolbar in basso.
                   </p>
                 </div>
               }
@@ -67,6 +67,7 @@
                     [class.canvas-item-quote]="nodeData.type === 'quote'"
                     [class.canvas-item-stats]="nodeData.type === 'stats'"
                     [class.canvas-item-cta]="nodeData.type === 'cta'"
+                    [class.canvas-item-share]="nodeData.type === 'share'"
                     [class.canvas-item-cv]="nodeData.type === 'cv'"
                     [style.grid-column]="getCanvasItemStyle(node).gridColumn"
                     [style.grid-row]="getCanvasItemStyle(node).gridRow"
@@ -416,6 +417,34 @@
                           </div>
                         }
 
+                        @if (nodeData.type === 'share') {
+                          <div class="canvas-share-module">
+                            <div class="share-preview-strip">
+                              @for (platform of sharePlatforms; track platform.id) {
+                                <span
+                                  class="share-preview-chip"
+                                  [class.share-preview-chip-active]="
+                                    isSharePlatformConfigured(nodeData, platform.id)
+                                  "
+                                  [attr.title]="platform.label"
+                                >
+                                  <svg
+                                    class="share-platform-icon"
+                                    viewBox="0 0 24 24"
+                                    aria-hidden="true"
+                                  >
+                                    <path [attr.d]="platform.iconPath"></path>
+                                  </svg>
+                                </span>
+                              }
+                            </div>
+
+                            <div class="inline-helper">
+                              Configura link social e numero WhatsApp dal pannello laterale.
+                            </div>
+                          </div>
+                        }
+
                         @if (nodeData.type === 'cv') {
                           <div
                             class="canvas-text-module"
@@ -494,7 +523,7 @@
         <section class="panel-card">
           <div class="panel-kicker">Portfolio</div>
 
-          <div [formGroup]="portfolioForm">
+          <div class="portfolio-fields" [formGroup]="portfolioForm">
             <label class="field-block">
               <span>Titolo portfolio</span>
               <input pInputText formControlName="title" placeholder="Es. Marco Rinaldi Portfolio" />
@@ -739,6 +768,30 @@
               </label>
             }
 
+            @if (selectedNode.type === 'share') {
+              <section class="share-config-panel">
+                <div class="helper-box">
+                  Inserisci gli URL dei profili social. Per WhatsApp usa direttamente il numero di
+                  telefono.
+                </div>
+
+                @for (platform of sharePlatforms; track platform.id) {
+                  <label class="field-block">
+                    <span>{{ platform.label }}</span>
+                    <input
+                      pInputText
+                      [value]="getSharePlatformValue(selectedNode, platform.id)"
+                      [placeholder]="getSharePlatformPlaceholder(platform.id)"
+                      (input)="updateSelectedSharePlatformValue(platform.id, $event)"
+                    />
+                    @if (platform.id === 'whatsapp') {
+                      <small>Solo cifre o numero internazionale, ad esempio `393331234567`.</small>
+                    }
+                  </label>
+                }
+              </section>
+            }
+
             @if (supportsTextFormatting(selectedNode.type)) {
               <div class="helper-box">
                 Modifica il contenuto direttamente nel blocco sul canvas. Qui trovi solo i controlli
@@ -762,15 +815,17 @@
                     />
                   </label>
 
-                  <label class="field-block">
-                    <span>Colore</span>
-                    <input
-                      type="color"
-                      class="color-input"
-                      [value]="getResolvedTextStyle(selectedNode).textColor || '#161815'"
-                      (input)="updateSelectedTextColor($event)"
-                    />
-                  </label>
+                  @if (selectedNode.type !== 'table') {
+                    <label class="field-block">
+                      <span>Colore</span>
+                      <input
+                        type="color"
+                        class="color-input"
+                        [value]="getResolvedTextStyle(selectedNode).textColor || '#161815'"
+                        (input)="updateSelectedTextColor($event)"
+                      />
+                    </label>
+                  }
                 </div>
 
                 <div class="field-block">
@@ -868,20 +923,68 @@
                 </div>
 
                 @if (selectedNode.type === 'table') {
-                  <label class="field-block">
-                    <span
-                      >Spessore righe
-                      {{ getResolvedTextStyle(selectedNode).tableBorderWidth }}px</span
-                    >
-                    <input
-                      type="range"
-                      min="0"
-                      max="12"
-                      step="0.5"
-                      [value]="getResolvedTextStyle(selectedNode).tableBorderWidth"
-                      (input)="updateSelectedTableBorderWidth($event)"
-                    />
-                  </label>
+                  <section class="table-format-panel">
+                    <div class="field-block">
+                      <span>Colori tabella</span>
+                    </div>
+
+                    <div class="field-grid">
+                      <label class="field-block">
+                        <span>Testo</span>
+                        <input
+                          type="color"
+                          class="color-input"
+                          [value]="getResolvedTextStyle(selectedNode).textColor || '#151713'"
+                          (input)="updateSelectedTextColor($event)"
+                        />
+                      </label>
+
+                      <label class="field-block">
+                        <span>Celle</span>
+                        <input
+                          type="color"
+                          class="color-input"
+                          [value]="getResolvedTextStyle(selectedNode).tableCellBackgroundColor"
+                          (input)="updateSelectedTableCellBackgroundColor($event)"
+                        />
+                      </label>
+
+                      <label class="field-block">
+                        <span>Header</span>
+                        <input
+                          type="color"
+                          class="color-input"
+                          [value]="getResolvedTextStyle(selectedNode).tableHeaderBackgroundColor"
+                          (input)="updateSelectedTableHeaderBackgroundColor($event)"
+                        />
+                      </label>
+
+                      <label class="field-block">
+                        <span>Bordi</span>
+                        <input
+                          type="color"
+                          class="color-input"
+                          [value]="getResolvedTextStyle(selectedNode).tableBorderColor"
+                          (input)="updateSelectedTableBorderColor($event)"
+                        />
+                      </label>
+                    </div>
+
+                    <label class="field-block">
+                      <span
+                        >Spessore righe
+                        {{ getResolvedTextStyle(selectedNode).tableBorderWidth }}px</span
+                      >
+                      <input
+                        type="range"
+                        min="0"
+                        max="12"
+                        step="0.5"
+                        [value]="getResolvedTextStyle(selectedNode).tableBorderWidth"
+                        (input)="updateSelectedTableBorderWidth($event)"
+                      />
+                    </label>
+                  </section>
                 }
               </section>
             }
@@ -898,50 +1001,78 @@
   </div>
 
   <div class="bottom-toolbar">
-    <a routerLink="/portfolios" class="toolbar-action toolbar-action-link">
-      <i class="pi pi-arrow-left"></i>
-      <span>Indietro</span>
-    </a>
+    <div class="toolbar-cluster">
+      <a routerLink="/portfolios" class="toolbar-action toolbar-action-link">
+        <i class="pi pi-arrow-left"></i>
+        <span>Indietro</span>
+      </a>
 
-    <button
-      type="button"
-      class="toolbar-action"
-      [disabled]="!canRemoveSelectedNode()"
-      (click)="removeSelectedNode()"
-    >
-      <i class="pi pi-trash"></i>
-      <span>Elimina</span>
-    </button>
+      <button
+        type="button"
+        class="toolbar-action"
+        [disabled]="!canRemoveSelectedNode()"
+        (click)="removeSelectedNode()"
+      >
+        <i class="pi pi-trash"></i>
+        <span>Elimina</span>
+      </button>
+    </div>
 
-    <div class="toolbar-tools">
-      @for (option of toolbarTools; track option.value) {
-        <button
-          type="button"
-          class="tool-chip"
-          [class.tool-chip-active]="isDraggingTool(option.value)"
-          (click)="addNodeFromToolbar(option.value)"
-          (pointerdown)="startToolbarDrag($event, option.value)"
-        >
-          <i [class]="option.icon"></i>
-          <span>{{ option.label }}</span>
-        </button>
+    <div class="toolbar-module-area">
+      <button
+        type="button"
+        class="toolbar-action toolbar-module-trigger"
+        [class.toolbar-module-trigger-active]="isModulePickerOpen()"
+        (click)="toggleModulePicker()"
+      >
+        <span class="toolbar-module-trigger-copy">
+          <i class="pi pi-plus-circle"></i>
+          <strong>Aggiungi modulo</strong>
+        </span>
+        <small>{{ toolbarTools.length }} tipi disponibili</small>
+      </button>
+
+      @if (isModulePickerOpen()) {
+        <div class="toolbar-module-picker">
+          <div class="toolbar-module-picker-head">
+            <strong>Moduli disponibili</strong>
+            <small>Clicca per inserirli subito oppure trascinali nel canvas.</small>
+          </div>
+
+          <div class="toolbar-tools">
+            @for (option of toolbarTools; track option.value) {
+              <button
+                type="button"
+                class="tool-chip"
+                [class.tool-chip-active]="isDraggingTool(option.value)"
+                (click)="addNodeFromToolbar(option.value)"
+                (pointerdown)="startToolbarDrag($event, option.value)"
+              >
+                <i [class]="option.icon"></i>
+                <span>{{ option.label }}</span>
+              </button>
+            }
+          </div>
+        </div>
       }
     </div>
 
-    <button type="button" class="toolbar-action" (click)="openLivePortfolio()">
-      <i class="pi pi-external-link"></i>
-      <span>Apri</span>
-    </button>
+    <div class="toolbar-cluster toolbar-cluster-end">
+      <button type="button" class="toolbar-action" (click)="openLivePortfolio()">
+        <i class="pi pi-external-link"></i>
+        <span>Apri</span>
+      </button>
 
-    <button
-      type="button"
-      class="toolbar-action toolbar-action-primary"
-      [disabled]="isSubmitting()"
-      (click)="submit()"
-    >
-      <i class="pi pi-check"></i>
-      <span>{{ isSubmitting() ? 'Salvataggio...' : 'Salva' }}</span>
-    </button>
+      <button
+        type="button"
+        class="toolbar-action toolbar-action-primary"
+        [disabled]="isSubmitting()"
+        (click)="submit()"
+      >
+        <i class="pi pi-check"></i>
+        <span>{{ isSubmitting() ? 'Salvataggio...' : 'Salva' }}</span>
+      </button>
+    </div>
   </div>
 
   @if (dragGhost(); as ghost) {

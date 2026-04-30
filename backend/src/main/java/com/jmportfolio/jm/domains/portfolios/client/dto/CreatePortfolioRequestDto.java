@@ -15,7 +15,15 @@ public class CreatePortfolioRequestDto {
     @NotBlank
     private String title;
 
+    private String slug;
+
+    private List<String> tags;
+
     private List<Map<String, Object>> modules;
+
+    private Boolean showHomeSnapshot;
+
+    private Boolean showInExplore;
 
     @JsonProperty("public")
     private Boolean isPublic;

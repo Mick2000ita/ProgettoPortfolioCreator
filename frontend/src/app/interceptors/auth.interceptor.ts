@@ -9,8 +9,9 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
     request.url.includes('/api/auth/google') ||
     request.url.includes('/api/auth/refresh') ||
     request.url.includes('/api/user/register');
+  const isPublicPortfolioRequest = request.url.includes('/api/portfolios/public/');
 
-  if (request.headers.has('Authorization') || isAuthRequest) {
+  if (request.headers.has('Authorization') || isAuthRequest || isPublicPortfolioRequest) {
     return next(request);
   }
 

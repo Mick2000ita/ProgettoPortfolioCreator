@@ -13,6 +13,9 @@ public class PortfolioPublicDto {
     private UUID id;
     private String title;
     private String slug;
+    private List<String> tags;
     private boolean isPublic;
+    private boolean showHomeSnapshot;
+    private boolean showInExplore;
     private List<Map<String, Object>> modules;
 }

@@ -84,16 +84,70 @@
   line-height: 1.65;
 }
 
-.portfolio-content strong {
+.portfolio-card-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 190px);
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.portfolio-copy {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.portfolio-copy strong {
   color: #eff6f2;
   font-size: 1.18rem;
 }
 
-.portfolio-content span {
+.portfolio-copy span {
   color: #8ed6bc;
 }
 
-.portfolio-content p {
+.tag-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.1rem;
+  gap: 0.3rem;
+  align-items: start;
+  justify-self: end;
+  width: min(100%, 190px);
+}
+
+:host ::ng-deep .portfolio-tag-select {
+  width: 100%;
+  min-height: 2.1rem;
+  border-radius: 8px;
+  background: rgba(8, 12, 13, 0.78);
+  border-color: rgba(145, 167, 158, 0.24);
+  color: #f7fffb;
+}
+
+:host ::ng-deep .portfolio-tag-select .p-multiselect-label-container {
+  min-width: 0;
+}
+
+:host ::ng-deep .portfolio-tag-select .p-multiselect-label {
+  padding: 0.35rem 0.55rem;
+  color: #f7fffb;
+  font-size: 0.78rem;
+}
+
+:host ::ng-deep .portfolio-tag-select .p-chip {
+  background: rgba(131, 209, 180, 0.16);
+  color: #d9fff0;
+  font-size: 0.72rem;
+  max-width: 7.5rem;
+}
+
+:host ::ng-deep .tag-save-button.p-button {
+  width: 2.1rem;
+  height: 2.1rem;
+  color: #8ed6bc;
+}
+
+.portfolio-copy p {
   margin: 0.2rem 0 0;
 }
 
@@ -167,5 +221,14 @@
   .page-head {
     align-items: start;
     flex-direction: column;
+  }
+
+  .portfolio-card-body {
+    grid-template-columns: 1fr;
+  }
+
+  .tag-editor {
+    justify-self: stretch;
+    width: 100%;
   }
 }

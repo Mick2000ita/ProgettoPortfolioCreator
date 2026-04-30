@@ -1,71 +1,140 @@
 <div class="profile-shell">
-  <section class="hero-panel">
-    <div class="hero-copy">
-      <div class="eyebrow">Profilo</div>
-      <h1>{{ user()?.username || 'Utente' }}</h1>
-      <p>
-        Questa area raccoglie le informazioni del tuo account e diventerà il punto di accesso per
-        gestire portfolio, immagini profilo e impostazioni personali.
-      </p>
-    </div>
+  <section class="profile-header">
+    <div class="profile-identity">
+      <div class="avatar-zone">
+        <div class="avatar-frame">
+          @if (avatarPreview()) {
+            <img
+              [src]="avatarPreview()"
+              [alt]="profile()?.username || user()?.username || 'Avatar utente'"
+            />
+          } @else {
+            <span>{{ avatarInitial() }}</span>
+          }
 
-    <div class="hero-profile">
-      <div class="avatar-frame">
-        @if (user()?.avatarUrl) {
-          <img [src]="user()?.avatarUrl" [alt]="user()?.username || 'Avatar utente'" />
-        } @else {
-          <span>{{ user()?.username?.charAt(0) || 'U' }}</span>
-        }
+          <div class="avatar-actions">
+            <button
+              type="button"
+              class="icon-button"
+              title="Cambia immagine"
+              [disabled]="saving()"
+              (click)="avatarInput.click()"
+            >
+              <span class="pi pi-camera"></span>
+            </button>
+            <button
+              type="button"
+              class="icon-button ghost"
+              title="Rimuovi immagine"
+              [disabled]="saving()"
+              (click)="removeAvatar()"
+            >
+              <span class="pi pi-times"></span>
+            </button>
+            <input
+              #avatarInput
+              class="file-input"
+              type="file"
+              accept="image/*"
+              (change)="onAvatarSelected($event)"
+            />
+          </div>
+        </div>
       </div>
 
       <div class="profile-meta">
-        <strong>{{ user()?.username || 'Utente' }}</strong>
-        <span>{{ user()?.email || 'Email non disponibile' }}</span>
+        <span class="eyebrow">Profilo</span>
+        <h1>{{ profile()?.username || user()?.username || 'Utente' }}</h1>
+        <p>{{ profile()?.email || user()?.email || 'Email non disponibile' }}</p>
       </div>
     </div>
   </section>
 
-  <section class="overview-grid">
-    <p-card styleClass="overview-card">
-      <ng-template #header>
-        <div class="card-top">
-          <span class="pi pi-id-card"></span>
-          <span>Identita'</span>
-        </div>
-      </ng-template>
-
-      <div class="card-content">
-        <strong>Presenza digitale pronta da modellare</strong>
-        <p>Username, immagine profilo e dati base saranno il volto del tuo portfolio pubblico.</p>
+  <form class="settings-panel" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
+    <div class="panel-heading">
+      <div>
+        <span class="eyebrow">Account</span>
+        <h2>Dati personali</h2>
       </div>
-    </p-card>
 
-    <p-card styleClass="overview-card">
-      <ng-template #header>
-        <div class="card-top">
-          <span class="pi pi-folder-open"></span>
-          <span>Portfolio</span>
+      @if (isGoogleSession()) {
+        <div class="provider-badge">
+          <span class="pi pi-google"></span>
+          <span>Accesso Google</span>
         </div>
-      </ng-template>
+      }
+    </div>
 
-      <div class="card-content">
-        <strong>Gestisci struttura e contenuti</strong>
-        <p>Da qui potrai collegare progetti, esperienze e template in un profilo coerente.</p>
-      </div>
-    </p-card>
-
-    <p-card styleClass="overview-card">
-      <ng-template #header>
-        <div class="card-top">
-          <span class="pi pi-cog"></span>
-          <span>Impostazioni</span>
+    @if (loading()) {
+      <div class="state-row">Caricamento profilo...</div>
+    } @else {
+      @if (isGoogleSession()) {
+        <div class="locked-note">
+          <span class="pi pi-lock"></span>
+          <span>Email e password sono gestite dal tuo account Google.</span>
         </div>
-      </ng-template>
+      }
 
-      <div class="card-content">
-        <strong>Controllo sulla pubblicazione</strong>
-        <p>Visibilita', slug e personalizzazioni del tuo spazio arriveranno qui.</p>
+      <div class="field-grid">
+        <label class="field">
+          <span>Email</span>
+          <input
+            type="email"
+            formControlName="email"
+            autocomplete="email"
+            [class.invalid]="
+              profileForm.controls.email.touched && profileForm.controls.email.invalid
+            "
+          />
+        </label>
+
+        <label class="field">
+          <span>Password attuale</span>
+          <input
+            type="password"
+            formControlName="currentPassword"
+            autocomplete="current-password"
+          />
+        </label>
+
+        <label class="field">
+          <span>Nuova password</span>
+          <input
+            type="password"
+            formControlName="newPassword"
+            autocomplete="new-password"
+            [class.invalid]="
+              profileForm.controls.newPassword.touched && profileForm.controls.newPassword.invalid
+            "
+          />
+        </label>
       </div>
-    </p-card>
-  </section>
+
+      @if (profileForm.controls.email.touched && profileForm.controls.email.hasError('email')) {
+        <p class="form-hint error">Inserisci una mail valida.</p>
+      }
+
+      @if (
+        profileForm.controls.newPassword.touched &&
+        profileForm.controls.newPassword.hasError('minlength')
+      ) {
+        <p class="form-hint error">La nuova password deve avere almeno 8 caratteri.</p>
+      }
+
+      @if (errorMessage()) {
+        <p class="form-hint error">{{ errorMessage() }}</p>
+      }
+
+      @if (statusMessage()) {
+        <p class="form-hint success">{{ statusMessage() }}</p>
+      }
+
+      <div class="actions-row">
+        <button type="submit" class="primary-action" [disabled]="saving()">
+          <span class="pi pi-save"></span>
+          <span>{{ saving() ? 'Salvataggio...' : 'Salva modifiche' }}</span>
+        </button>
+      </div>
+    }
+  </form>
 </div>

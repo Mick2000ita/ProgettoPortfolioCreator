@@ -494,13 +494,292 @@ p {
   padding-top: 2rem;
 }
 
-.dashboard-stats {
+.dashboard-snapshot {
   align-self: stretch;
+  display: grid;
+  align-content: end;
+  justify-items: end;
+  gap: 0.45rem;
+  padding-bottom: 0.25rem;
+  text-align: right;
+}
+
+:host ::ng-deep .metric-card .p-card-body,
+:host ::ng-deep .analytics-card .p-card-body {
+  height: 100%;
+}
+
+:host ::ng-deep .metric-card .p-card-content,
+:host ::ng-deep .analytics-card .p-card-content {
+  height: 100%;
+}
+
+.dashboard-snapshot span {
+  color: #9ee6ca;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dashboard-snapshot strong {
+  color: #eff6f2;
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
+  line-height: 0.95;
+}
+
+.dashboard-snapshot small {
+  color: #9ee6ca;
+}
+
+.dashboard-snapshot .snapshot-negative {
+  color: #ffd9d9;
 }
 
 .dashboard-grid {
   grid-template-columns: minmax(0, 1.35fr) minmax(20rem, 0.65fr);
   margin-top: 1.2rem;
+}
+
+.dashboard-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard-content {
+  grid-template-columns: minmax(0, 0.92fr) minmax(28rem, 1.08fr);
+}
+
+:host ::ng-deep .metric-card,
+:host ::ng-deep .analytics-card {
+  border-radius: 1.2rem;
+  color: #eff6f2;
+  background: rgba(8, 15, 16, 0.72);
+  border: 1px solid rgba(186, 220, 206, 0.1);
+  backdrop-filter: blur(18px);
+}
+
+:host ::ng-deep .metric-card .p-card-content {
+  display: grid;
+  align-content: start;
+  gap: 0.65rem;
+}
+
+:host ::ng-deep .metric-card-with-bg-icon .p-card-content {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding-bottom: 1.25rem;
+}
+
+:host ::ng-deep .metric-card-with-bg-icon .p-card-content > :not(.metric-background-icon) {
+  position: relative;
+  z-index: 1;
+}
+
+:host ::ng-deep .metric-background-icon {
+  position: absolute;
+  left: 50%;
+  bottom: 0.15rem;
+  z-index: -1;
+  transform: translateX(-50%);
+  color: #9ee6ca;
+  font-size: clamp(4.3rem, 5.8vw, 5.6rem);
+  line-height: 1;
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+.metric-card strong {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  line-height: 1;
+}
+
+.metric-card span {
+  color: #eff6f2;
+  font-weight: 700;
+}
+
+.metric-card small {
+  color: #9fb4ad;
+  line-height: 1.5;
+}
+
+.loading-line {
+  width: 9rem;
+  height: 0.9rem;
+  display: block;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.18));
+}
+
+.loading-line-large {
+  width: 5rem;
+  height: 2.8rem;
+  border-radius: 0.8rem;
+}
+
+:host ::ng-deep .analytics-card .p-card-title {
+  color: #eff6f2;
+  font-size: 1.25rem;
+}
+
+:host ::ng-deep .analytics-card .p-card-subtitle {
+  color: #9fb4ad;
+}
+
+.trend-chart {
+  padding-top: 1rem;
+}
+
+.trend-chart-plot {
+  position: relative;
+  width: min(100%, 34rem);
+  margin-inline: auto;
+  aspect-ratio: 100 / 60;
+  min-height: 13.5rem;
+  border-radius: 0.9rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(186, 220, 206, 0.08);
+  overflow: hidden;
+}
+
+.trend-chart-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.trend-grid-line {
+  stroke: rgba(186, 220, 206, 0.13);
+  stroke-width: 0.35;
+}
+
+.trend-area {
+  fill: url('#trend-area-gradient');
+}
+
+.trend-line {
+  fill: none;
+  stroke: #83d1b4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.05;
+  filter: drop-shadow(0 0 0.35rem rgba(131, 209, 180, 0.34));
+}
+
+.trend-point-halo {
+  fill: rgba(131, 209, 180, 0.16);
+  stroke: rgba(131, 209, 180, 0.28);
+  stroke-width: 0.35;
+}
+
+.trend-point {
+  fill: #f7d26d;
+  stroke: #071112;
+  stroke-width: 0.55;
+}
+
+.trend-value-marker {
+  pointer-events: none;
+}
+
+.trend-value-marker rect {
+  fill: rgba(7, 17, 18, 0.9);
+  stroke: rgba(131, 209, 180, 0.24);
+  stroke-width: 0.28;
+}
+
+.trend-value-marker text {
+  fill: #eff6f2;
+  font-size: 3.15px;
+  font-weight: 700;
+  dominant-baseline: middle;
+}
+
+.trend-axis-label {
+  fill: #9fb4ad;
+  font-size: 3.05px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.portfolio-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.portfolio-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(9rem, 0.42fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.9rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(186, 220, 206, 0.08);
+}
+
+.portfolio-copy {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.portfolio-copy div,
+.portfolio-views {
+  min-width: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.portfolio-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portfolio-copy span,
+.portfolio-views span {
+  color: #9fb4ad;
+  font-size: 0.86rem;
+}
+
+.portfolio-views strong {
+  font-size: 1.2rem;
+}
+
+.view-progress {
+  height: 0.42rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.view-progress span {
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: #83d1b4;
+}
+
+.portfolio-actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.portfolio-actions a {
+  width: 2.35rem;
+  height: 2.35rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #eff6f2;
+  background: rgba(255, 255, 255, 0.08);
+  text-decoration: none;
 }
 
 .dashboard-panel {
@@ -663,7 +942,9 @@ p {
   }
 
   .metric-row,
-  .dashboard-stats {
+  .dashboard-stats,
+  .dashboard-metrics,
+  .dashboard-content {
     grid-template-columns: 1fr;
   }
 
@@ -680,5 +961,20 @@ p {
 
   .recent-actions {
     justify-content: flex-start;
+  }
+
+  .trend-chart-plot {
+    min-height: 10.5rem;
+    max-height: none;
+  }
+
+  .portfolio-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .portfolio-copy {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

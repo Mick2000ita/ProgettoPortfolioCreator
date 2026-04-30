@@ -16,8 +16,11 @@ public class Portfolio {
     private UUID id;
     private String title;
     private String slug;
+    private List<String> tags;
     private List<Object> publicData;
     private List<Object> wipData;
+    private boolean showHomeSnapshot;
+    private boolean showInExplore;
     private boolean isPublic;
     private User user;
 }

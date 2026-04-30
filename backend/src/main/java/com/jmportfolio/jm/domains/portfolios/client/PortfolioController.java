@@ -11,13 +11,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.jmportfolio.jm.core.auth.model.ExtendedAuthUser;
 import com.jmportfolio.jm.domains.portfolios.application.PortfolioService;
 import com.jmportfolio.jm.domains.portfolios.client.dto.CreatePortfolioRequestDto;
+import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioAnalyticsDto;
 import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioPublicDto;
+import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioSlugAvailabilityDto;
 import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioSummaryDto;
+import com.jmportfolio.jm.domains.portfolios.client.dto.UpdatePortfolioTagsRequestDto;
 import com.jmportfolio.jm.domains.portfolios.client.dto.UpdatePortfolioVisibilityRequestDto;
 
 import jakarta.validation.Valid;
@@ -40,6 +44,17 @@ public class PortfolioController {
     public List<PortfolioSummaryDto> getMyPortfolios(
             @AuthenticationPrincipal ExtendedAuthUser authenticatedUser) {
         return portfolioService.getUserPortfolios(authenticatedUser.getUsername());
+    }
+
+    @GetMapping("/me/analytics")
+    public PortfolioAnalyticsDto getMyPortfolioAnalytics(
+            @AuthenticationPrincipal ExtendedAuthUser authenticatedUser) {
+        return portfolioService.getUserPortfolioAnalytics(authenticatedUser.getUsername());
+    }
+
+    @GetMapping("/slug-availability")
+    public PortfolioSlugAvailabilityDto checkSlugAvailability(@RequestParam String slug) {
+        return portfolioService.checkSlugAvailability(slug);
     }
 
     @GetMapping("/{slug}")
@@ -66,6 +81,15 @@ public class PortfolioController {
                 request.isPublic());
     }
 
+    @PutMapping("/{slug}/tags")
+    public PortfolioSummaryDto updatePortfolioTags(
+            @AuthenticationPrincipal ExtendedAuthUser authenticatedUser,
+            @PathVariable String slug,
+            @RequestBody UpdatePortfolioTagsRequestDto request) {
+        return portfolioService.updatePortfolioTags(authenticatedUser.getUsername(), slug,
+                request.getTags());
+    }
+
     @DeleteMapping("/{slug}")
     public void deletePortfolio(
             @AuthenticationPrincipal ExtendedAuthUser authenticatedUser,
@@ -76,5 +100,10 @@ public class PortfolioController {
     @GetMapping("/public/{slug}")
     public PortfolioPublicDto getPublicPortfolio(@PathVariable String slug) {
         return portfolioService.getPublicPortfolioBySlug(slug);
+    }
+
+    @PostMapping("/public/{slug}/views")
+    public void trackPublicPortfolioView(@PathVariable String slug) {
+        portfolioService.trackPublicPortfolioView(slug);
     }
 }

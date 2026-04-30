@@ -3,12 +3,14 @@ package com.jmportfolio.jm.domains.users.client;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.jmportfolio.jm.core.auth.model.ExtendedAuthUser;
 import com.jmportfolio.jm.domains.users.application.UserService;
 import com.jmportfolio.jm.domains.users.client.dto.RegisterUserDto;
+import com.jmportfolio.jm.domains.users.client.dto.UpdateUserProfileDto;
 import com.jmportfolio.jm.domains.users.client.dto.UserProfileDto;
 
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,13 @@ public class UserController {
     public UserProfileDto getCurrentUserProfile(
             @AuthenticationPrincipal ExtendedAuthUser authenticatedUser) {
         return userService.getProfileByUsername(authenticatedUser.getUsername());
+    }
+
+    @PutMapping("/me")
+    public UserProfileDto updateCurrentUserProfile(
+            @AuthenticationPrincipal ExtendedAuthUser authenticatedUser,
+            @RequestBody UpdateUserProfileDto dto) {
+        return userService.updateProfileByUsername(authenticatedUser.getUsername(), dto);
     }
     
 }

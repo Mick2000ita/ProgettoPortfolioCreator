@@ -8,6 +8,8 @@ const REFRESH_TOKEN_COOKIE = 'portfolio_creator_refresh_token';
 const USER_COOKIE = 'portfolio_creator_user';
 const PROVIDER_COOKIE = 'portfolio_creator_provider';
 const REMEMBER_ME_COOKIE = 'portfolio_creator_remember_me';
+const SESSION_STORAGE_KEY = 'portfolio_creator_session';
+const REMEMBERED_SESSION_STORAGE_KEY = 'portfolio_creator_remembered_session';
 const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
 
 export interface SessionUser {
@@ -25,7 +27,7 @@ interface SessionState {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AuthSessionService {
   private readonly platformId = inject(PLATFORM_ID);
@@ -37,6 +39,8 @@ export class AuthSessionService {
 
   readonly user = computed(() => this.sessionState()?.user ?? null);
   readonly authenticated = computed(() => this.sessionState() !== null);
+  readonly provider = computed(() => this.sessionState()?.provider ?? 'credentials');
+  readonly isGoogleSession = computed(() => this.provider() === 'google');
 
   async initializeSession() {
     if (!this.isBrowser()) {
@@ -45,27 +49,32 @@ export class AuthSessionService {
 
     const accessToken = this.readCookie(ACCESS_TOKEN_COOKIE);
     const refreshToken = this.readCookie(REFRESH_TOKEN_COOKIE);
-    const rememberedSession = this.readCookie(REMEMBER_ME_COOKIE) === 'true';
-    const user = this.readUserCookie();
-    const provider = this.readProviderCookie();
+    const storedSession = this.readStoredSession();
+    const sessionAccessToken = accessToken ?? storedSession?.accessToken ?? null;
+    const sessionRefreshToken = refreshToken ?? storedSession?.refreshToken ?? null;
+    const rememberedSession = this.readRememberedSessionFlag(sessionRefreshToken, storedSession);
+    const user = storedSession?.user ?? this.readUserCookie() ?? null;
+    const provider = this.readProviderCookie(storedSession?.provider);
 
-    if (accessToken && user && !this.isJwtExpired(accessToken)) {
+    if (sessionAccessToken && user && !this.isJwtExpired(sessionAccessToken)) {
       this.sessionState.set({
-        accessToken,
-        refreshToken,
+        accessToken: sessionAccessToken,
+        refreshToken: sessionRefreshToken,
         provider,
         rememberMe: rememberedSession,
-        user
+        user,
       });
       return;
     }
 
-    if (refreshToken) {
+    if (sessionRefreshToken) {
       try {
-        const response = await firstValueFrom(this.authApiService.refreshSession(refreshToken));
+        const response = await firstValueFrom(
+          this.authApiService.refreshSession(sessionRefreshToken),
+        );
         this.saveLoginSession(response, {
           rememberMe: rememberedSession,
-          provider
+          provider,
         });
         return;
       } catch {
@@ -79,7 +88,7 @@ export class AuthSessionService {
 
   saveLoginSession(
     response: LoginResponseDto,
-    options?: { rememberMe?: boolean; provider?: 'credentials' | 'google' }
+    options?: { rememberMe?: boolean; provider?: 'credentials' | 'google' },
   ) {
     const rememberMe = Boolean(options?.rememberMe);
     const session: SessionState = {
@@ -90,8 +99,8 @@ export class AuthSessionService {
       user: {
         email: response.user.email,
         username: response.user.username,
-        avatarUrl: response.user.avatarUrl
-      }
+        avatarUrl: response.user.avatarUrl,
+      },
     };
 
     this.persistSession(session);
@@ -103,6 +112,21 @@ export class AuthSessionService {
 
   isAuthenticated() {
     return this.authenticated();
+  }
+
+  updateSessionUser(user: SessionUser) {
+    const currentSession = this.sessionState();
+    if (!currentSession) {
+      return;
+    }
+
+    this.persistSession({
+      ...currentSession,
+      user: {
+        ...currentSession.user,
+        ...user,
+      },
+    });
   }
 
   getAccessToken() {
@@ -134,6 +158,8 @@ export class AuthSessionService {
       this.deleteCookie(USER_COOKIE);
       this.deleteCookie(PROVIDER_COOKIE);
       this.deleteCookie(REMEMBER_ME_COOKIE);
+      window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      window.localStorage.removeItem(REMEMBERED_SESSION_STORAGE_KEY);
     }
 
     this.sessionState.set(null);
@@ -159,13 +185,16 @@ export class AuthSessionService {
       this.deleteCookie(REFRESH_TOKEN_COOKIE);
     }
 
-    this.writeCookie(USER_COOKIE, JSON.stringify(session.user), maxAge);
+    this.writeCookie(USER_COOKIE, JSON.stringify(this.toCookieUser(session.user)), maxAge);
     this.writeCookie(PROVIDER_COOKIE, session.provider, maxAge);
+    window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
 
     if (session.rememberMe) {
       this.writeCookie(REMEMBER_ME_COOKIE, 'true', THIRTY_DAYS_IN_SECONDS);
+      window.localStorage.setItem(REMEMBERED_SESSION_STORAGE_KEY, JSON.stringify(session));
     } else {
       this.deleteCookie(REMEMBER_ME_COOKIE);
+      window.localStorage.removeItem(REMEMBERED_SESSION_STORAGE_KEY);
     }
 
     this.sessionState.set(session);
@@ -178,14 +207,15 @@ export class AuthSessionService {
       return null;
     }
 
-    const rememberMe = this.readCookie(REMEMBER_ME_COOKIE) === 'true';
-    const provider = this.readProviderCookie();
+    const storedSession = this.readStoredSession();
+    const rememberMe = this.readRememberedSessionFlag(refreshToken, storedSession);
+    const provider = this.readProviderCookie(storedSession?.provider);
 
     try {
       const response = await firstValueFrom(this.authApiService.refreshSession(refreshToken));
       this.saveLoginSession(response, {
         rememberMe,
-        provider
+        provider,
       });
       return response.accessToken;
     } catch {
@@ -197,10 +227,11 @@ export class AuthSessionService {
   private writeCookie(name: string, value: string, maxAgeSeconds?: number) {
     const secureAttribute =
       typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
-    const maxAgeAttribute =
-      typeof maxAgeSeconds === 'number' ? `; Max-Age=${maxAgeSeconds}` : '';
+    const maxAgeAttribute = typeof maxAgeSeconds === 'number' ? `; Max-Age=${maxAgeSeconds}` : '';
 
-    this.document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; SameSite=Lax${maxAgeAttribute}${secureAttribute}`;
+    this.document.cookie =
+      `${name}=${encodeURIComponent(value)}; Path=/; SameSite=Lax` +
+      `${maxAgeAttribute}${secureAttribute}`;
   }
 
   private readCookie(name: string) {
@@ -231,18 +262,52 @@ export class AuthSessionService {
     }
   }
 
-  private readProviderCookie(): 'credentials' | 'google' {
-    return this.readCookie(PROVIDER_COOKIE) === 'google' ? 'google' : 'credentials';
+  private readStoredSession() {
+    return this.readSessionStorageSession() ?? this.readRememberedSession();
+  }
+
+  private readSessionStorageSession() {
+    if (!this.isBrowser()) {
+      return null;
+    }
+
+    const rawSession = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (!rawSession) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(rawSession) as SessionState;
+    } catch {
+      window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+  }
+
+  private toCookieUser(user: SessionUser): SessionUser {
+    const cookieUser = { ...user };
+    const serializedUser = JSON.stringify(cookieUser);
+
+    if (serializedUser.length > 3000) {
+      cookieUser.avatarUrl = null;
+    }
+
+    return cookieUser;
+  }
+
+  private readProviderCookie(
+    fallback: 'credentials' | 'google' = 'credentials',
+  ): 'credentials' | 'google' {
+    const provider = this.readCookie(PROVIDER_COOKIE);
+    if (provider === 'google' || provider === 'credentials') {
+      return provider;
+    }
+    return fallback;
   }
 
   private isJwtExpired(token: string) {
     try {
-      const payloadSegment = token.split('.')[1];
-      if (!payloadSegment) {
-        return true;
-      }
-
-      const payload = JSON.parse(this.decodeBase64Url(payloadSegment)) as { exp?: number };
+      const payload = this.readJwtPayload<{ exp?: number }>(token);
       if (!payload.exp) {
         return true;
       }
@@ -251,6 +316,53 @@ export class AuthSessionService {
     } catch {
       return true;
     }
+  }
+
+  private readRememberedSessionFlag(
+    refreshToken?: string | null,
+    storedSession?: SessionState | null,
+  ) {
+    if (this.readCookie(REMEMBER_ME_COOKIE) === 'true' || storedSession?.rememberMe) {
+      return true;
+    }
+
+    if (!refreshToken) {
+      return false;
+    }
+
+    try {
+      const payload = this.readJwtPayload<{ rememberMe?: boolean | string }>(refreshToken);
+      return payload.rememberMe === true || payload.rememberMe === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  private readRememberedSession() {
+    if (!this.isBrowser()) {
+      return null;
+    }
+
+    const rawSession = window.localStorage.getItem(REMEMBERED_SESSION_STORAGE_KEY);
+    if (!rawSession) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(rawSession) as SessionState;
+    } catch {
+      window.localStorage.removeItem(REMEMBERED_SESSION_STORAGE_KEY);
+      return null;
+    }
+  }
+
+  private readJwtPayload<T extends object>(token: string) {
+    const payloadSegment = token.split('.')[1];
+    if (!payloadSegment) {
+      throw new Error('JWT payload is missing');
+    }
+
+    return JSON.parse(this.decodeBase64Url(payloadSegment)) as T;
   }
 
   private decodeBase64Url(value: string) {

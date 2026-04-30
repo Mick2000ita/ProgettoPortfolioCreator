@@ -1,18 +1,28 @@
 import { isPlatformBrowser } from '@angular/common';
 import { Component, OnInit, PLATFORM_ID, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { MultiSelectModule } from 'primeng/multiselect';
+import { PORTFOLIO_TAG_OPTIONS } from '../portfolio-tags';
 import { AuthApiService, UserPortfolioSummaryDto } from '../services/auth-api.service';
 
 @Component({
   selector: 'app-portfolios-page',
-  imports: [ButtonModule, CardModule, RouterLink, ConfirmDialogModule],
+  imports: [
+    ButtonModule,
+    CardModule,
+    RouterLink,
+    ConfirmDialogModule,
+    FormsModule,
+    MultiSelectModule,
+  ],
   providers: [ConfirmationService],
   templateUrl: './portfolios-page.html',
-  styleUrl: './portfolios-page.scss'
+  styleUrl: './portfolios-page.scss',
 })
 export class PortfoliosPage implements OnInit {
   private readonly platformId = inject(PLATFORM_ID);
@@ -25,6 +35,9 @@ export class PortfoliosPage implements OnInit {
   protected readonly loadError = signal(false);
   protected readonly deletingSlug = signal<string | null>(null);
   protected readonly visibilitySlug = signal<string | null>(null);
+  protected readonly tagSavingSlug = signal<string | null>(null);
+  protected readonly tagDrafts = signal<Record<string, string[]>>({});
+  protected readonly portfolioTagOptions = PORTFOLIO_TAG_OPTIONS;
 
   ngOnInit() {
     if (!isPlatformBrowser(this.platformId)) {
@@ -37,12 +50,13 @@ export class PortfoliosPage implements OnInit {
     this.authApiService.getMyPortfolios().subscribe({
       next: (portfolios) => {
         this.portfolios.set(portfolios);
+        this.tagDrafts.set(this.createTagDrafts(portfolios));
         this.isLoading.set(false);
       },
       error: () => {
         this.loadError.set(true);
         this.isLoading.set(false);
-      }
+      },
     });
   }
 
@@ -64,7 +78,43 @@ export class PortfoliosPage implements OnInit {
       },
       error: () => {
         this.visibilitySlug.set(null);
-      }
+      },
+    });
+  }
+
+  protected getTagDraft(portfolio: UserPortfolioSummaryDto) {
+    return this.tagDrafts()[portfolio.slug] ?? portfolio.tags ?? [];
+  }
+
+  protected updateTagDraft(slug: string, tags: string[]) {
+    this.tagDrafts.update((drafts) => ({
+      ...drafts,
+      [slug]: [...tags],
+    }));
+  }
+
+  protected hasTagChanges(portfolio: UserPortfolioSummaryDto) {
+    return !this.areTagsEqual(this.getTagDraft(portfolio), portfolio.tags ?? []);
+  }
+
+  protected savePortfolioTags(portfolio: UserPortfolioSummaryDto) {
+    const tags = this.getTagDraft(portfolio);
+    this.tagSavingSlug.set(portfolio.slug);
+
+    this.authApiService.updatePortfolioTags(portfolio.slug, { tags }).subscribe({
+      next: (updatedPortfolio) => {
+        this.portfolios.update((portfolios) =>
+          portfolios.map((currentPortfolio) =>
+            currentPortfolio.slug === updatedPortfolio.slug ? updatedPortfolio : currentPortfolio
+          )
+        );
+        this.updateTagDraft(updatedPortfolio.slug, updatedPortfolio.tags ?? []);
+        this.tagSavingSlug.set(null);
+      },
+      error: () => {
+        this.updateTagDraft(portfolio.slug, portfolio.tags ?? []);
+        this.tagSavingSlug.set(null);
+      },
     });
   }
 
@@ -78,7 +128,7 @@ export class PortfoliosPage implements OnInit {
       acceptButtonStyleClass: 'p-button-danger',
       accept: () => {
         this.deletePortfolio(portfolio.slug);
-      }
+      },
     });
   }
 
@@ -94,7 +144,22 @@ export class PortfoliosPage implements OnInit {
       },
       error: () => {
         this.deletingSlug.set(null);
-      }
+      },
     });
+  }
+
+  private createTagDrafts(portfolios: UserPortfolioSummaryDto[]) {
+    return portfolios.reduce<Record<string, string[]>>((drafts, portfolio) => {
+      drafts[portfolio.slug] = [...(portfolio.tags ?? [])];
+      return drafts;
+    }, {});
+  }
+
+  private areTagsEqual(firstTags: string[], secondTags: string[]) {
+    if (firstTags.length !== secondTags.length) {
+      return false;
+    }
+
+    return firstTags.every((tag, index) => tag === secondTags[index]);
   }
 }

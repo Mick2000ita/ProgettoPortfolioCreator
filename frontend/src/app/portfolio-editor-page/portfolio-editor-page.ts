@@ -1,6 +1,7 @@
 import { NgStyle, isPlatformBrowser } from '@angular/common';
 import {
   Component,
+  DestroyRef,
   ElementRef,
   HostListener,
   OnDestroy,
@@ -11,6 +12,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TreeNode } from 'primeng/api';
@@ -24,6 +26,7 @@ import {
   PortfolioModuleDto,
 } from '../services/auth-api.service';
 import { PdfImportService } from '../services/pdf-import.service';
+import { PortfolioPreviewLiveService } from '../services/portfolio-preview-live.service';
 import {
   CODE_LANGUAGE_OPTIONS,
   CodeLanguageOption,
@@ -35,9 +38,15 @@ import {
   EditorNodeTextStyle,
   PORTFOLIO_EDITOR_CONTENT_OPTIONS,
   PortfolioEditorStateService,
+  SharePlatformId,
+  SharePlatformOption,
+  parseShareEntries,
   resolveCodeLanguage,
   resolveBackgroundImages,
+  resolveSharePlatformHref,
   resolveTextStyle,
+  serializeShareEntries,
+  SHARE_PLATFORM_OPTIONS,
   supportsTextFormatting,
 } from '../services/portfolio-editor-state.service';
 
@@ -48,7 +57,6 @@ const MAX_CANVAS_ROWS = 420;
 const FREEFORM_LAYOUT_MARKER = 'freeform-canvas-v2';
 const LEGACY_COLUMN_SCALE = 4;
 const LEGACY_ROW_SCALE = 3;
-const PORTFOLIO_PREVIEW_STORAGE_KEY = 'portfolio-editor-preview';
 
 interface CanvasTarget {
   column: number;
@@ -110,11 +118,14 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly authApiService = inject(AuthApiService);
   private readonly pdfImportService = inject(PdfImportService);
+  private readonly portfolioPreviewLiveService = inject(PortfolioPreviewLiveService);
   private readonly portfolioEditorStateService = inject(PortfolioEditorStateService);
   private lastToolbarCreateAt = 0;
   private backgroundAutoplayIntervalId: number | null = null;
+  private livePreviewTimerId: number | null = null;
 
   protected readonly portfolioForm = this.formBuilder.nonNullable.group({
     title: ['', [Validators.required]],
@@ -127,10 +138,12 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
   protected readonly extractionError = signal<string | null>(null);
   protected readonly editingSlug = signal<string | null>(null);
   protected readonly portfolioVisibility = signal(true);
+  protected readonly isModulePickerOpen = signal(false);
   protected readonly interaction = signal<EditorInteraction | null>(null);
   protected readonly backgroundFrame = signal(0);
   protected readonly contentOptions: ContentOption[] = PORTFOLIO_EDITOR_CONTENT_OPTIONS;
   protected readonly codeLanguageOptions: CodeLanguageOption[] = CODE_LANGUAGE_OPTIONS;
+  protected readonly sharePlatforms: SharePlatformOption[] = SHARE_PLATFORM_OPTIONS;
   protected readonly toolbarTools = this.contentOptions.filter(
     (option) => option.value !== 'background',
   );
@@ -201,11 +214,17 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     }
 
     this.editingSlug.set(slug);
+    this.portfolioForm.controls.title.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.schedulePreviewSnapshot());
     this.loadPortfolio(slug);
   }
 
   ngOnDestroy() {
     this.stopBackgroundAutoplay();
+    if (this.livePreviewTimerId !== null) {
+      window.clearTimeout(this.livePreviewTimerId);
+    }
   }
 
   @HostListener('window:pointermove', ['$event'])
@@ -285,6 +304,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     if (currentInteraction.mode === 'create' && currentInteraction.target) {
       this.lastToolbarCreateAt = Date.now();
       this.createNodeAtTarget(currentInteraction.type, currentInteraction.target);
+      this.isModulePickerOpen.set(false);
     }
 
     this.interaction.set(null);
@@ -292,7 +312,12 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
 
   @HostListener('window:keydown.escape')
   protected onWindowEscape() {
-    this.interaction.set(null);
+    if (this.interaction()) {
+      this.interaction.set(null);
+      return;
+    }
+
+    this.isModulePickerOpen.set(false);
   }
 
   protected trackNode(_index: number, node: TreeNode<EditorNodeData>) {
@@ -321,6 +346,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
   }
 
   protected onCanvasPointerDown(event: PointerEvent) {
+    this.isModulePickerOpen.set(false);
     if (event.target === event.currentTarget) {
       this.portfolioEditorStateService.selectNodeByKey(null);
     }
@@ -328,6 +354,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
 
   protected selectNode(node: TreeNode<EditorNodeData>, event?: Event) {
     event?.stopPropagation();
+    this.isModulePickerOpen.set(false);
     this.portfolioEditorStateService.selectNodeByKey(node.key ?? null);
   }
 
@@ -351,11 +378,16 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
 
     const layout = this.buildQuickAddLayout(type, this.pageNodes().length);
     this.lastToolbarCreateAt = Date.now();
+    this.isModulePickerOpen.set(false);
     this.createNodeAtTarget(type, {
       column: layout.columnStart,
       row: layout.rowStart,
       layout,
     });
+  }
+
+  protected toggleModulePicker() {
+    this.isModulePickerOpen.update((value) => !value);
   }
 
   protected startNodeMove(event: PointerEvent, node: TreeNode<EditorNodeData>) {
@@ -376,6 +408,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
 
   protected removeSelectedNode() {
     this.portfolioEditorStateService.removeSelectedNode();
+    this.schedulePreviewSnapshot();
   }
 
   protected canRemoveSelectedNode() {
@@ -392,6 +425,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
       (event.target as HTMLInputElement).value || DEFAULT_BACKGROUND_COLOR;
     backgroundNodeData.helperText = FREEFORM_LAYOUT_MARKER;
     this.portfolioEditorStateService.refreshTree();
+    this.schedulePreviewSnapshot();
   }
 
   protected async onBackgroundImagesSelected(event: Event) {
@@ -418,6 +452,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     backgroundNodeData.helperText = FREEFORM_LAYOUT_MARKER;
     inputElement.value = '';
     this.portfolioEditorStateService.refreshTree();
+    this.schedulePreviewSnapshot();
   }
 
   protected async onBackgroundCarouselSelected(event: Event) {
@@ -442,6 +477,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     backgroundNodeData.helperText = FREEFORM_LAYOUT_MARKER;
     inputElement.value = '';
     this.portfolioEditorStateService.refreshTree();
+    this.schedulePreviewSnapshot();
   }
 
   protected async appendBackgroundCarouselSlides(imageIndex: number, event: Event) {
@@ -502,6 +538,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     );
     backgroundNodeData.helperText = FREEFORM_LAYOUT_MARKER;
     this.portfolioEditorStateService.refreshTree();
+    this.schedulePreviewSnapshot();
   }
 
   protected getBackgroundImageStyle(image: PortfolioBackgroundImageDto) {
@@ -541,6 +578,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     );
     backgroundNodeData.helperText = FREEFORM_LAYOUT_MARKER;
     this.portfolioEditorStateService.refreshTree();
+    this.schedulePreviewSnapshot();
   }
 
   private startBackgroundAutoplay() {
@@ -638,6 +676,54 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     return resolveCodeLanguage(language);
   }
 
+  protected getSharePlatformValue(nodeData: EditorNodeData, platformId: SharePlatformId) {
+    return (
+      parseShareEntries(nodeData.textValue).find((entry) => entry.platformId === platformId)?.value ??
+      ''
+    );
+  }
+
+  protected isSharePlatformConfigured(nodeData: EditorNodeData, platformId: SharePlatformId) {
+    return Boolean(resolveSharePlatformHref(platformId, this.getSharePlatformValue(nodeData, platformId)));
+  }
+
+  protected updateSharePlatformValue(
+    node: TreeNode<EditorNodeData>,
+    platformId: SharePlatformId,
+    event: Event,
+  ) {
+    if (!node.data || node.data.type !== 'share') {
+      return;
+    }
+
+    const nextValue = (event.target as HTMLInputElement).value;
+    const entries = parseShareEntries(node.data.textValue);
+    const nextEntries = entries.filter((entry) => entry.platformId !== platformId);
+
+    if (nextValue.trim()) {
+      nextEntries.push({
+        platformId,
+        value: nextValue,
+      });
+    }
+
+    node.data.textValue = serializeShareEntries(nextEntries);
+    this.refreshSelectedNode(node.key ?? null);
+  }
+
+  protected updateSelectedSharePlatformValue(platformId: SharePlatformId, event: Event) {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode) {
+      return;
+    }
+
+    this.updateSharePlatformValue(selectedNode, platformId, event);
+  }
+
+  protected getSharePlatformPlaceholder(platformId: SharePlatformId) {
+    return platformId === 'whatsapp' ? 'Es. 393331234567' : 'https://...';
+  }
+
   protected updateSelectedButtonLabel(event: Event) {
     const selectedNode = this.selectedTreeNode();
     if (!selectedNode?.data) {
@@ -686,7 +772,8 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
 
   protected getCanvasTextModuleStyle(nodeData: EditorNodeData) {
     const textStyle = this.getResolvedTextStyle(nodeData);
-    const textEffects = this.getTextContrastEffects(textStyle.textColor);
+    const textEffects =
+      nodeData.type === 'table' ? this.getNoTextEffects() : this.getTextContrastEffects(textStyle.textColor);
     const style: Record<string, string> = {
       '--text-font-size': `${textStyle.fontSize}px`,
       '--text-align': textStyle.textAlign,
@@ -695,6 +782,10 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
       '--text-font-weight': textStyle.bold ? '700' : '400',
       '--text-font-style': textStyle.italic ? 'italic' : 'normal',
       '--table-border-width': `${textStyle.tableBorderWidth}px`,
+      '--table-border-color': textStyle.tableBorderColor,
+      '--table-cell-background-color': textStyle.tableCellBackgroundColor,
+      '--table-header-background-color': textStyle.tableHeaderBackgroundColor,
+      '--table-text-color': textStyle.textColor || '#151713',
       '--text-shadow': textEffects.shadow,
       '--text-stroke-width': textEffects.strokeWidth,
       '--text-stroke-color': textEffects.strokeColor,
@@ -732,6 +823,14 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
 
     return {
       shadow: '0 1px 1px rgba(0, 0, 0, 0.32), 0 0 12px rgba(0, 0, 0, 0.16)',
+      strokeWidth: '0px',
+      strokeColor: 'transparent',
+    };
+  }
+
+  private getNoTextEffects() {
+    return {
+      shadow: 'none',
       strokeWidth: '0px',
       strokeColor: 'transparent',
     };
@@ -841,6 +940,39 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     const fallback = this.getResolvedTextStyle(selectedNode.data).tableBorderWidth;
     const value = this.readNumberInput(event, fallback);
     this.updateSelectedTextStyleField('tableBorderWidth', Math.min(Math.max(value, 0), 12));
+  }
+
+  protected updateSelectedTableBorderColor(event: Event) {
+    this.updateSelectedTableColorField(
+      'tableBorderColor',
+      (event.target as HTMLInputElement).value,
+    );
+  }
+
+  protected updateSelectedTableCellBackgroundColor(event: Event) {
+    this.updateSelectedTableColorField(
+      'tableCellBackgroundColor',
+      (event.target as HTMLInputElement).value,
+    );
+  }
+
+  protected updateSelectedTableHeaderBackgroundColor(event: Event) {
+    this.updateSelectedTableColorField(
+      'tableHeaderBackgroundColor',
+      (event.target as HTMLInputElement).value,
+    );
+  }
+
+  private updateSelectedTableColorField(
+    field: 'tableBorderColor' | 'tableCellBackgroundColor' | 'tableHeaderBackgroundColor',
+    value: string,
+  ) {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode?.data || selectedNode.data.type !== 'table') {
+      return;
+    }
+
+    this.updateSelectedTextStyleField(field, value);
   }
 
   protected updateSelectedLayout(field: keyof EditorNodeLayout, event: Event, fallback: number) {
@@ -1156,7 +1288,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     });
   }
 
-  protected openLivePortfolio() {
+  protected async openLivePortfolio() {
     const slug = this.editingSlug();
     const payload = this.buildPortfolioPayload();
     if (!slug || !payload) {
@@ -1172,7 +1304,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
       previewWindow.document.close();
     }
 
-    this.writePreviewSnapshot(slug, payload);
+    await this.writePreviewSnapshot(slug, payload);
 
     if (previewWindow) {
       previewWindow.location.href = `/${slug}?preview=1`;
@@ -1228,6 +1360,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
       nextNode,
     ]);
     this.portfolioEditorStateService.selectNodeByKey(nextNode.key ?? null);
+    this.schedulePreviewSnapshot();
   }
 
   private loadPortfolio(slug: string) {
@@ -1241,6 +1374,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
         this.portfolioEditorStateService.setActiveTemplateId(null);
         this.portfolioEditorStateService.setTreeNodes(this.deserializeNodes(portfolio.modules));
         this.isLoadingPortfolio.set(false);
+        this.schedulePreviewSnapshot();
 
         const firstNode = this.pageNodes()[0] ?? null;
         this.portfolioEditorStateService.selectNodeByKey(firstNode?.key ?? null);
@@ -1417,8 +1551,11 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     });
   }
 
-  private buildPortfolioPayload(): CreatePortfolioRequestDto | null {
-    this.portfolioForm.markAllAsTouched();
+  private buildPortfolioPayload(markAsTouched = true): CreatePortfolioRequestDto | null {
+    if (markAsTouched) {
+      this.portfolioForm.markAllAsTouched();
+    }
+
     if (this.portfolioForm.invalid) {
       return null;
     }
@@ -1435,38 +1572,44 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     };
   }
 
-  private persistPreviewSnapshot() {
-    const payload = this.buildPortfolioPayload();
+  private async persistPreviewSnapshot() {
+    const payload = this.buildPortfolioPayload(false);
     const slug = this.editingSlug();
-    if (!payload || !slug || !this.canUseLocalStorage()) {
+    if (!payload || !slug) {
       return;
     }
 
-    this.writePreviewSnapshot(slug, payload);
+    await this.writePreviewSnapshot(slug, payload);
   }
 
-  private writePreviewSnapshot(slug: string, payload: CreatePortfolioRequestDto) {
-    if (!this.canUseLocalStorage()) {
+  private schedulePreviewSnapshot() {
+    if (!isPlatformBrowser(this.platformId)) {
       return;
     }
 
+    if (this.livePreviewTimerId !== null) {
+      window.clearTimeout(this.livePreviewTimerId);
+    }
+
+    this.livePreviewTimerId = window.setTimeout(() => {
+      this.livePreviewTimerId = null;
+      void this.persistPreviewSnapshot();
+    }, 120);
+  }
+
+  private async writePreviewSnapshot(slug: string, payload: CreatePortfolioRequestDto) {
     const previewSnapshot = {
+      id: '',
       title: payload.title,
       slug,
+      tags: [],
       public: payload.public ?? true,
       modules: payload.modules,
       savedAt: Date.now(),
     };
 
-    try {
-      window.localStorage.setItem(PORTFOLIO_PREVIEW_STORAGE_KEY, JSON.stringify(previewSnapshot));
-    } catch {
-      try {
-        window.localStorage.removeItem(PORTFOLIO_PREVIEW_STORAGE_KEY);
-      } catch {
-        // Preview navigation must keep working even when browser storage is unavailable.
-      }
-    }
+    await this.portfolioPreviewLiveService.writeStoredPreview(previewSnapshot);
+    this.portfolioPreviewLiveService.publish(slug, previewSnapshot);
   }
 
   private getCanvasTarget(
@@ -1565,6 +1708,8 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
         return { columnStart: 4, rowStart: 12, columnSpan: 24, rowSpan: 10 };
       case 'cta':
         return { columnStart: 6, rowStart: 26, columnSpan: 28, rowSpan: 6 };
+      case 'share':
+        return { columnStart: 8, rowStart: 28, columnSpan: 16, rowSpan: 5 };
       case 'cv':
         return { columnStart: 7, rowStart: 8, columnSpan: 24, rowSpan: 20 };
       case 'background':
@@ -1585,6 +1730,8 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
           ? 12
           : type === 'cta'
             ? 14
+            : type === 'share'
+              ? 10
             : type === 'quote' || type === 'stats' || type === 'carousel' || type === 'code'
               ? 12
               : 10;
@@ -1595,6 +1742,8 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
           ? 6
           : type === 'cta'
             ? 4
+            : type === 'share'
+              ? 4
             : type === 'quote' || type === 'stats' || type === 'code'
               ? 6
               : type === 'image'
@@ -1715,6 +1864,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
       type === 'quote' ||
       type === 'stats' ||
       type === 'cta' ||
+      type === 'share' ||
       type === 'cv' ||
       type === 'background'
     );
@@ -1727,6 +1877,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
   private refreshSelectedNode(key: string | null) {
     this.portfolioEditorStateService.refreshTree();
     this.portfolioEditorStateService.selectNodeByKey(key);
+    this.schedulePreviewSnapshot();
   }
 
   private readNumberInput(event: Event, fallback: number) {
@@ -1771,9 +1922,5 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
       .trim()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
-  }
-
-  private canUseLocalStorage() {
-    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
   }
 }

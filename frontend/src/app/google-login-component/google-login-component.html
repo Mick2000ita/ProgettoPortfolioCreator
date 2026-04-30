@@ -1,1 +1,11 @@
 <div #googleButtonHost class="google-button-host"></div>
+
+@if (!cookieConsentService.hasAccepted()) {
+  <div class="google-consent">
+    <span>{{ googleLoginMessage() }}</span>
+    <button type="button" (click)="acceptCookiesForGoogleLogin()">
+      <i class="pi pi-check" aria-hidden="true"></i>
+      Attiva
+    </button>
+  </div>
+}

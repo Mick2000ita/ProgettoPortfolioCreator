@@ -40,6 +40,11 @@ public class PortfolioJpaEntity extends BaseJpaEntity {
 
     @Type(JsonBinaryType.class)
     @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "JSONB", nullable = false)
+    private List<String> tags;
+
+    @Type(JsonBinaryType.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "public_data", columnDefinition = "JSONB")
     private List<Object> publicData;
 
@@ -47,6 +52,12 @@ public class PortfolioJpaEntity extends BaseJpaEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "wip_data", columnDefinition = "JSONB")
     private List<Object> wipData;
+
+    @Column(name = "show_home_snapshot", nullable = false)
+    private boolean showHomeSnapshot;
+
+    @Column(name = "show_in_explore", nullable = false)
+    private boolean showInExplore;
 
     @Column(name = "is_public")
     private boolean isPublic;

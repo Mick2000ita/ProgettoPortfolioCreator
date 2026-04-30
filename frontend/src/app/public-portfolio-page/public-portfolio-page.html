@@ -42,6 +42,7 @@
               [class.public-node-quote]="module.type === 'quote'"
               [class.public-node-stats]="module.type === 'stats'"
               [class.public-node-cta]="module.type === 'cta'"
+              [class.public-node-share]="module.type === 'share'"
               [class.public-node-cv]="module.type === 'cv'"
               [style.grid-column]="getModuleStyle(module).gridColumn"
               [style.grid-row]="getModuleStyle(module).gridRow"
@@ -209,6 +210,37 @@
                 </div>
               }
 
+              @if (module.type === 'share') {
+                @if (hasShareLinks(module)) {
+                  <section class="public-share-box">
+                    <div class="public-share-actions">
+                      @for (platform of sharePlatforms; track platform.id) {
+                        @if (getShareLink(module, platform.id); as href) {
+                          <a
+                            class="share-action-button"
+                            [href]="href"
+                            target="_blank"
+                            rel="noreferrer"
+                            [attr.aria-label]="platform.label"
+                            [attr.title]="platform.label"
+                          >
+                            <svg
+                              class="share-action-icon"
+                              viewBox="0 0 24 24"
+                              aria-hidden="true"
+                            >
+                              <path [attr.d]="platform.iconPath"></path>
+                            </svg>
+                          </a>
+                        }
+                      }
+                    </div>
+                  </section>
+                } @else {
+                  <div class="module-placeholder">Nessun social configurato.</div>
+                }
+              }
+
               @if (module.type === 'cv') {
                 <div class="public-text-module" [ngStyle]="getTextModuleStyle(module)">
                   <section class="public-cv-box">
@@ -240,5 +272,17 @@
         </section>
       }
     </section>
+
+    <footer class="public-site-footer" aria-label="Informazioni del sito">
+      <div class="public-footer-links">
+        <a routerLink="/privacy">Privacy</a>
+        <span>Copyright © {{ currentYear }}</span>
+        <span>Credits</span>
+      </div>
+
+      <p>
+        Sito creato da Michele Bonato con la collaborazione di Andrea Mengato.
+      </p>
+    </footer>
   }
 </div>

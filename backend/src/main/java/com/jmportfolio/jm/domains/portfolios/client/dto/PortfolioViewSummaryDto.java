@@ -1,4 +1,4 @@
-package com.jmportfolio.jm.domains.users.client.dto;
+package com.jmportfolio.jm.domains.portfolios.client.dto;
 
 import java.util.List;
 import java.util.UUID;
@@ -8,7 +8,7 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public class UserPortfolioSummaryDto {
+public class PortfolioViewSummaryDto {
     private UUID id;
     private String title;
     private String slug;
@@ -16,4 +16,6 @@ public class UserPortfolioSummaryDto {
     private boolean isPublic;
     private boolean showHomeSnapshot;
     private boolean showInExplore;
+    private long totalViews;
+    private long monthlyViews;
 }

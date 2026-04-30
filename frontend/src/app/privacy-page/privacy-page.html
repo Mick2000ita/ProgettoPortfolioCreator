@@ -1,0 +1,129 @@
+<main class="privacy-shell">
+  <section class="privacy-hero">
+    <a routerLink="/" class="back-link">
+      <i class="pi pi-arrow-left"></i>
+      Torna al sito
+    </a>
+
+    <div>
+      <span>Informativa privacy</span>
+      <h1>Protezione dei dati personali</h1>
+      <p>
+        Questa informativa descrive come Portfolio Creator tratta i dati personali degli utenti che
+        creano portfolio e dei visitatori che consultano le pagine pubbliche.
+      </p>
+    </div>
+
+    <small>Ultimo aggiornamento: {{ lastUpdated }}</small>
+  </section>
+
+  <section class="privacy-content" aria-label="Informativa sul trattamento dei dati">
+    <article>
+      <h2>Titolare del trattamento</h2>
+      <p>
+        Il titolare del trattamento e' Michele Bonato. Il sito e' stato creato da Michele Bonato con
+        la collaborazione di Andrea Mengato.
+      </p>
+      <p class="notice">
+        Prima della pubblicazione definitiva, inserire qui il recapito privacy ufficiale del
+        titolare, ad esempio un indirizzo email o PEC dedicato alle richieste sui dati personali.
+      </p>
+    </article>
+
+    <article>
+      <h2>Dati trattati</h2>
+      <ul>
+        <li>Dati account: username, email, password cifrata, eventuale avatar e data ultimo accesso.</li>
+        <li>Dati di autenticazione: token di accesso, token di refresh e preferenza "ricordami".</li>
+        <li>Dati provenienti da Google Login: identificativi, email, nome utente e immagine profilo forniti da Google.</li>
+        <li>Dati portfolio: titolo, slug pubblico, contenuti, immagini, link, moduli, impostazioni grafiche e stato pubblico/privato.</li>
+        <li>Dati tecnici e di utilizzo: richieste al server, errori applicativi, conteggi aggregati delle visualizzazioni dei portfolio pubblici solo dopo consenso ai cookie.</li>
+      </ul>
+    </article>
+
+    <article>
+      <h2>Finalita e basi giuridiche</h2>
+      <ul>
+        <li>Creazione e gestione account: esecuzione del servizio richiesto dall'utente.</li>
+        <li>Login, sicurezza e mantenimento sessione: esecuzione del servizio e legittimo interesse alla sicurezza.</li>
+        <li>Creazione, salvataggio e pubblicazione dei portfolio: esecuzione del servizio.</li>
+        <li>Visualizzazione delle pagine pubbliche: erogazione del contenuto richiesto dal visitatore.</li>
+        <li>Conteggio visite dei portfolio pubblici e servizi esterni come Google Login: consenso dell'utente tramite banner cookie.</li>
+        <li>Adempimenti tecnici, amministrativi o richieste dell'autorita': obbligo legale, quando applicabile.</li>
+      </ul>
+    </article>
+
+    <article>
+      <h2>Cookie e memoria locale</h2>
+      <p>
+        Il sito usa cookie tecnici e memoria locale del browser per autenticazione, mantenimento
+        della sessione, preferenza "ricordami" e anteprima locale del portfolio. Questi strumenti
+        sono necessari al funzionamento del servizio e non sono usati per profilazione pubblicitaria.
+      </p>
+      <p>
+        Le statistiche di visita e il caricamento di servizi esterni non partono finche' l'utente non
+        accetta i cookie dal banner. Il rifiuto impedisce questi trattamenti non essenziali.
+      </p>
+      <div class="cookie-preferences" aria-label="Preferenze cookie">
+        <button type="button" (click)="cookieConsentService.reject()">Rifiuta cookie non essenziali</button>
+        <button type="button" (click)="cookieConsentService.accept()">Accetta cookie</button>
+      </div>
+    </article>
+
+    <article>
+      <h2>Conservazione</h2>
+      <ul>
+        <li>I dati account sono conservati finche' l'account resta attivo o finche' servono per obblighi legali.</li>
+        <li>I portfolio sono conservati finche' l'utente li mantiene nel proprio account o fino alla cancellazione.</li>
+        <li>I token e i cookie di sessione hanno durata tecnica limitata; con "ricordami" la sessione puo' essere mantenuta fino a 30 giorni.</li>
+        <li>I dati statistici sulle visualizzazioni, raccolti solo dopo consenso, sono conservati per produrre riepiloghi e trend del servizio.</li>
+      </ul>
+    </article>
+
+    <article>
+      <h2>Destinatari e fornitori</h2>
+      <p>
+        I dati possono essere trattati da fornitori tecnici necessari al funzionamento del sito,
+        come hosting, database, servizi infrastrutturali, strumenti di autenticazione e servizi di
+        identita' Google quando l'utente sceglie il login Google. I dati non sono venduti a terzi.
+      </p>
+    </article>
+
+    <article>
+      <h2>Trasferimenti fuori dallo Spazio Economico Europeo</h2>
+      <p>
+        Alcuni fornitori tecnici, inclusi servizi Google, possono comportare trattamenti o accessi da
+        Paesi extra SEE. In questi casi il trattamento deve avvenire sulla base degli strumenti di
+        garanzia previsti dal GDPR, come decisioni di adeguatezza o clausole contrattuali standard.
+      </p>
+    </article>
+
+    <article>
+      <h2>Diritti degli interessati</h2>
+      <p>
+        L'utente puo' chiedere accesso, rettifica, cancellazione, limitazione, opposizione,
+        portabilita' dei dati e revoca del consenso quando il trattamento si basa sul consenso. La
+        revoca non pregiudica la liceita' del trattamento effettuato prima della revoca.
+      </p>
+    </article>
+
+    <article>
+      <h2>Reclamo</h2>
+      <p>
+        Se ritieni che il trattamento violi la normativa applicabile, puoi proporre reclamo al
+        Garante per la protezione dei dati personali o all'autorita' di controllo competente.
+      </p>
+      <a href="https://www.garanteprivacy.it/" target="_blank" rel="noreferrer">
+        Apri il sito del Garante Privacy
+      </a>
+    </article>
+
+    <article>
+      <h2>Modifiche</h2>
+      <p>
+        Questa informativa puo' essere aggiornata per riflettere modifiche tecniche, organizzative o
+        normative. La versione aggiornata sara' pubblicata su questa pagina.
+      </p>
+    </article>
+  </section>
+</main>

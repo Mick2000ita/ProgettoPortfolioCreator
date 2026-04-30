@@ -50,6 +50,7 @@ public class SecurityConf {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/user/register").permitAll()
                         .requestMatchers("/api/portfolios/public/**").permitAll()
+                        .requestMatchers("/ws/preview").permitAll()
                         .anyRequest().authenticated())
                 .cors(Customizer.withDefaults())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

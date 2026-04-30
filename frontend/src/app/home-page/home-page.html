@@ -2,120 +2,177 @@
   @if (isAuthenticated()) {
     <section class="dashboard-hero">
       <div class="dashboard-copy">
-        <div class="eyebrow">Launchpad</div>
-        <h1>Ciao {{ user()?.username || 'creator' }}, ripartiamo dal tuo spazio portfolio.</h1>
+        <div class="eyebrow">Dashboard</div>
+        <h1>Ciao {{ user()?.username || 'creator' }}, ecco come stanno andando i portfolio.</h1>
         <p>
-          Qui trovi una vista rapida dei portfolio pubblicati, quelli ancora privati e le
-          scorciatoie per aprire l'editor o partire da un layout guidato.
+          Una vista pulita su portfolio attivi, pubblicazione, visualizzazioni e andamento degli
+          ultimi mesi.
         </p>
-
-        <div class="dashboard-actions">
-          <a routerLink="/portfolios/new" class="action-link">
-            <p-button label="Nuovo portfolio" icon="pi pi-plus-circle" />
-          </a>
-          <a routerLink="/portfolios" class="action-link">
-            <p-button label="Vai ai portfolio" icon="pi pi-briefcase" [outlined]="true" />
-          </a>
-        </div>
       </div>
 
-      <div class="dashboard-stats" aria-label="Riepilogo portfolio">
-        <article>
+      <div class="dashboard-snapshot" aria-label="Riepilogo stato portfolio">
+        <span>Questo mese</span>
+        <strong>{{ viewStats().monthlyViews }} visualizzazioni</strong>
+        <small [class.snapshot-negative]="viewStats().delta < 0">
+          {{ viewStats().deltaLabel }} rispetto al mese scorso
+        </small>
+      </div>
+    </section>
+
+    @if (isLoadingAnalytics()) {
+      <section class="dashboard-grid dashboard-metrics">
+        <p-card styleClass="metric-card">
+          <span class="loading-line loading-line-large"></span>
+          <span class="loading-line"></span>
+        </p-card>
+        <p-card styleClass="metric-card">
+          <span class="loading-line loading-line-large"></span>
+          <span class="loading-line"></span>
+        </p-card>
+        <p-card styleClass="metric-card">
+          <span class="loading-line loading-line-large"></span>
+          <span class="loading-line"></span>
+        </p-card>
+      </section>
+    } @else if (loadError()) {
+      <section class="dashboard-grid">
+        <p-card styleClass="state-card state-card-error">
+          <strong>Qualcosa non ha risposto.</strong>
+          <p>{{ loadError() }}</p>
+        </p-card>
+      </section>
+    } @else {
+      <section class="dashboard-grid dashboard-metrics">
+        <p-card styleClass="metric-card metric-card-with-bg-icon">
+          <i class="metric-background-icon pi pi-briefcase" aria-hidden="true"></i>
           <strong>{{ portfolioStats().total }}</strong>
-          <span>totali</span>
-        </article>
-        <article>
-          <strong>{{ portfolioStats().public }}</strong>
-          <span>pubblici</span>
-        </article>
-        <article>
-          <strong>{{ portfolioStats().private }}</strong>
-          <span>privati</span>
-        </article>
-      </div>
-    </section>
+          <span>portfolio totali</span>
+          <small>{{ portfolioStats().public }} pubblici, {{ portfolioStats().private }} privati</small>
+        </p-card>
 
-    <section class="dashboard-grid">
-      <div class="dashboard-panel dashboard-panel-large">
-        <div class="panel-head">
-          <div>
-            <div class="panel-kicker">Continua</div>
-            <h2>I tuoi portfolio recenti</h2>
-          </div>
-          <a routerLink="/portfolios">Vedi tutti</a>
-        </div>
+        <p-card styleClass="metric-card metric-card-with-bg-icon">
+          <i class="metric-background-icon pi pi-eye" aria-hidden="true"></i>
+          <strong>{{ viewStats().totalViews }}</strong>
+          <span>visualizzazioni portfolio</span>
+          <small>{{ viewStats().monthlyViews }} nel mese corrente</small>
+        </p-card>
 
-        @if (isLoadingPortfolios()) {
-          <div class="state-card">
-            <strong>Caricamento in corso...</strong>
-            <p>Sto recuperando i portfolio collegati al tuo account.</p>
-          </div>
-        } @else if (loadError()) {
-          <div class="state-card state-card-error">
-            <strong>Qualcosa non ha risposto.</strong>
-            <p>{{ loadError() }}</p>
-          </div>
-        } @else if (recentPortfolios().length > 0) {
-          <div class="recent-list">
-            @for (portfolio of recentPortfolios(); track portfolio.id) {
-              <article class="recent-card">
-                <div>
-                  <span class="status-pill" [class.status-pill-public]="portfolio.public">
-                    {{ portfolio.public ? 'Pubblico' : 'Privato' }}
-                  </span>
-                  <h3>{{ portfolio.title }}</h3>
-                  <p>/{{ portfolio.slug }}</p>
-                </div>
+        <p-card styleClass="metric-card metric-card-with-bg-icon">
+          <i class="metric-background-icon pi pi-chart-line" aria-hidden="true"></i>
+          <strong>{{ viewStats().deltaLabel }}</strong>
+          <span>andamento mensile</span>
+          <small>{{ viewStats().previousMonthViews }} visualizzazioni il mese scorso</small>
+        </p-card>
+      </section>
 
-                <div class="recent-actions">
-                  <a [routerLink]="['/', portfolio.slug]" aria-label="Apri portfolio pubblico">
-                    <i class="pi pi-eye"></i>
-                  </a>
-                  <a
-                    [routerLink]="['/portfolios', portfolio.slug, 'edit']"
-                    aria-label="Modifica portfolio"
+      <section class="dashboard-grid dashboard-content">
+        <p-card styleClass="analytics-card trend-card">
+          <ng-template #title>Andamento mensile</ng-template>
+          <ng-template #subtitle>Visualizzazioni registrate negli ultimi 6 mesi</ng-template>
+
+          <div class="trend-chart" aria-label="Andamento mensile visualizzazioni">
+            <div class="trend-chart-plot">
+              <svg
+                class="trend-chart-svg"
+                [attr.viewBox]="trendChart().viewBox"
+                preserveAspectRatio="xMidYMid meet"
+                role="img"
+              >
+                <defs>
+                  <linearGradient id="trend-area-gradient" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="#83d1b4" stop-opacity="0.34" />
+                    <stop offset="100%" stop-color="#83d1b4" stop-opacity="0.02" />
+                  </linearGradient>
+                </defs>
+
+                @for (line of trendChart().gridLines; track line.y) {
+                  <line
+                    class="trend-grid-line"
+                    [attr.x1]="trendChart().plotLeft"
+                    [attr.x2]="trendChart().plotRight"
+                    [attr.y1]="line.y"
+                    [attr.y2]="line.y"
+                  />
+                }
+
+                <path class="trend-area" [attr.d]="trendChart().areaPath"></path>
+                <polyline class="trend-line" [attr.points]="trendChart().linePoints"></polyline>
+
+                @for (point of trendChart().points; track point.month) {
+                  <circle class="trend-point-halo" [attr.cx]="point.x" [attr.cy]="point.y" r="3.2" />
+                  <circle class="trend-point" [attr.cx]="point.x" [attr.cy]="point.y" r="1.6" />
+                  <g class="trend-value-marker" [attr.transform]="'translate(' + point.x + ' ' + point.labelY + ')'">
+                    <rect x="-4.4" y="-6.5" width="8.8" height="5.2" rx="2.6"></rect>
+                    <text y="-2.9" text-anchor="middle">{{ point.views }}</text>
+                  </g>
+                  <text
+                    class="trend-axis-label"
+                    [attr.x]="point.x"
+                    [attr.y]="point.axisLabelY"
+                    text-anchor="middle"
                   >
-                    <i class="pi pi-pen-to-square"></i>
-                  </a>
-                </div>
-              </article>
-            }
+                    {{ point.label }}
+                  </text>
+                }
+              </svg>
+            </div>
           </div>
-        } @else {
-          <div class="state-card empty-launch">
-            <strong>Non hai ancora portfolio.</strong>
-            <p>
-              Il modo piu veloce per iniziare e' scegliere un layout e completare gli slot guidati.
-            </p>
-            <a routerLink="/portfolios/new" class="action-link">
-              <p-button label="Crea il primo portfolio" icon="pi pi-sparkles" />
-            </a>
-          </div>
-        }
-      </div>
+        </p-card>
 
-      <div class="dashboard-panel">
-        <div class="panel-head">
-          <div>
-            <div class="panel-kicker">Template</div>
-            <h2>Partenze rapide</h2>
-          </div>
-        </div>
+        <p-card styleClass="analytics-card portfolio-card">
+          <ng-template #title>Portfolio</ng-template>
+          <ng-template #subtitle>Metriche e stato delle pagine pubbliche</ng-template>
 
-        <div class="quick-template-list">
-          @for (layout of layoutTemplates; track layout.id) {
-            <a routerLink="/portfolios/new" class="quick-template-card">
-              <span class="template-orb" [style.background]="layout.accent"></span>
-              <div>
-                <strong>{{ layout.name }}</strong>
-                <p>{{ layout.preview }}</p>
-              </div>
-              <i class="pi pi-arrow-right"></i>
-            </a>
+          @if (recentPortfolios().length > 0) {
+            <div class="portfolio-list">
+              @for (portfolio of recentPortfolios(); track portfolio.id) {
+                <article class="portfolio-row">
+                  <div class="portfolio-copy">
+                    <span class="status-pill" [class.status-pill-public]="portfolio.public">
+                      {{ portfolio.public ? 'Pubblico' : 'Privato' }}
+                    </span>
+                    <div>
+                      <strong>{{ portfolio.title }}</strong>
+                      <span>/{{ portfolio.slug }}</span>
+                    </div>
+                  </div>
+
+                  <div class="portfolio-views">
+                    <strong>{{ portfolio.totalViews }}</strong>
+                    <span>view totali</span>
+                    <div class="view-progress">
+                      <span [style.width.%]="getPortfolioViewShare(portfolio)"></span>
+                    </div>
+                  </div>
+
+                  <div class="portfolio-actions">
+                    @if (portfolio.public) {
+                      <a [routerLink]="['/', portfolio.slug]" aria-label="Apri portfolio pubblico">
+                        <i class="pi pi-window-maximize"></i>
+                      </a>
+                    }
+                    <a
+                      [routerLink]="['/portfolios', portfolio.slug, 'edit']"
+                      aria-label="Modifica portfolio"
+                    >
+                      <i class="pi pi-pen-to-square"></i>
+                    </a>
+                  </div>
+                </article>
+              }
+            </div>
+          } @else {
+            <div class="state-card empty-launch">
+              <strong>Non hai ancora portfolio.</strong>
+              <p>Crea il primo portfolio per iniziare a raccogliere visualizzazioni reali.</p>
+              <a routerLink="/portfolios/new" class="action-link">
+                <p-button label="Crea portfolio" icon="pi pi-plus" />
+              </a>
+            </div>
           }
-        </div>
-      </div>
-    </section>
+        </p-card>
+      </section>
+    }
   } @else {
     <section class="marketing-hero">
       <div class="hero-copy">
@@ -219,7 +276,7 @@
     <section class="template-section">
       <div class="section-heading">
         <div class="eyebrow">Layout guidati</div>
-        <h2>Tre direzioni reali, gia collegate all'editor.</h2>
+        <h2>Layout per professioni reali, gia collegati all'editor.</h2>
       </div>
 
       <div class="template-grid">
@@ -253,7 +310,7 @@
         <h2>La preview che salvi diventa subito una pagina condivisibile.</h2>
         <p>
           Il renderer pubblico usa gli stessi moduli del canvas: testi formattati, immagini,
-          carousel, tabelle, stats, CV scaricabile e CTA restano coerenti con l'editor.
+          carousel, tabelle, stats e CTA restano coerenti con l'editor.
         </p>
       </div>
 

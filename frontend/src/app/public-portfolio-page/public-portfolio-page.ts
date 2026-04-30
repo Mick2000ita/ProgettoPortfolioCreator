@@ -1,6 +1,15 @@
 import { NgStyle, isPlatformBrowser } from '@angular/common';
-import { Component, OnDestroy, OnInit, PLATFORM_ID, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  PLATFORM_ID,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   PortfolioBackgroundImageDto,
   AuthApiService,
@@ -14,11 +23,17 @@ import {
   DEFAULT_BACKGROUND_COLOR,
   EditorNodeTextStyle,
   EditorNodeLayout,
+  parseShareEntries,
   resolveCodeLanguage,
   resolveBackgroundImages,
   resolveTextStyle,
+  SHARE_PLATFORM_OPTIONS,
+  resolveSharePlatformHref,
+  SharePlatformOption,
   supportsTextFormatting,
 } from '../services/portfolio-editor-state.service';
+import { CookieConsentService } from '../services/cookie-consent.service';
+import { PortfolioPreviewLiveService } from '../services/portfolio-preview-live.service';
 
 const CANVAS_COLUMNS = 48;
 const CANVAS_ROW_HEIGHT = 18;
@@ -27,7 +42,6 @@ const MAX_CANVAS_ROWS = 420;
 const FREEFORM_LAYOUT_MARKER = 'freeform-canvas-v2';
 const LEGACY_COLUMN_SCALE = 4;
 const LEGACY_ROW_SCALE = 3;
-const PORTFOLIO_PREVIEW_STORAGE_KEY = 'portfolio-editor-preview';
 
 interface RenderableModule extends PortfolioModuleDto {
   resolvedLayout: EditorNodeLayout;
@@ -41,7 +55,7 @@ interface StatRow {
 
 @Component({
   selector: 'app-public-portfolio-page',
-  imports: [NgStyle],
+  imports: [NgStyle, RouterLink],
   templateUrl: './public-portfolio-page.html',
   styleUrl: './public-portfolio-page.scss',
 })
@@ -49,13 +63,18 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly route = inject(ActivatedRoute);
   private readonly authApiService = inject(AuthApiService);
+  private readonly cookieConsentService = inject(CookieConsentService);
+  private readonly portfolioPreviewLiveService = inject(PortfolioPreviewLiveService);
   private readonly isBrowser = isPlatformBrowser(this.platformId);
+  private disconnectLivePreview: (() => void) | null = null;
 
   protected readonly portfolio = signal<PortfolioPublicDto | null>(null);
   protected readonly notFound = signal(false);
   protected readonly isLoading = signal(true);
   protected readonly carouselIndexes = signal<Record<string, number>>({});
   protected readonly backgroundFrame = signal(0);
+  protected readonly sharePlatforms: SharePlatformOption[] = SHARE_PLATFORM_OPTIONS;
+  protected readonly currentYear = new Date().getFullYear();
   protected readonly renderableModules = computed(() =>
     this.buildRenderableModules(this.portfolio()?.modules ?? []),
   );
@@ -80,6 +99,15 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
     return Math.min(MAX_CANVAS_ROWS, Math.max(MIN_CANVAS_ROWS, bottomEdge));
   });
   private autoplayIntervalId: number | null = null;
+  private currentSlug: string | null = null;
+  private isPreviewMode = false;
+  private hasRecordedView = false;
+
+  private readonly consentEffect = effect(() => {
+    if (this.cookieConsentService.hasAccepted()) {
+      this.recordPortfolioViewWhenAllowed();
+    }
+  });
 
   ngOnInit() {
     if (!this.isBrowser) {
@@ -93,33 +121,47 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
       return;
     }
 
-    const previewMode = this.route.snapshot.queryParamMap.get('preview') === '1';
-    const localPreview = previewMode ? this.readLocalPreview(slug) : null;
-    if (localPreview) {
-      this.portfolio.set(localPreview);
-      this.startCarouselAutoplay();
+    this.currentSlug = slug;
+    this.isPreviewMode = this.route.snapshot.queryParamMap.get('preview') === '1';
+
+    if (this.isPreviewMode) {
+      this.disconnectLivePreview = this.portfolioPreviewLiveService.connect(slug, (snapshot) => {
+        this.portfolio.set(snapshot);
+        this.notFound.set(false);
+        this.isLoading.set(false);
+        this.startCarouselAutoplay();
+      });
+      void this.loadStoredPreview(slug);
+      return;
     }
 
     this.authApiService.getPublicPortfolio(slug).subscribe({
       next: (portfolio) => {
-        const hasModules = Array.isArray(portfolio.modules) && portfolio.modules.length > 0;
-        if (hasModules || !localPreview) {
-          this.portfolio.set(portfolio);
-        }
+        this.portfolio.set(portfolio);
         this.startCarouselAutoplay();
         this.isLoading.set(false);
+        this.recordPortfolioViewWhenAllowed();
       },
       error: () => {
-        if (!localPreview) {
-          this.notFound.set(true);
-        }
+        this.notFound.set(true);
         this.isLoading.set(false);
       },
     });
   }
 
   ngOnDestroy() {
+    this.disconnectLivePreview?.();
     this.stopCarouselAutoplay();
+  }
+
+  private async loadStoredPreview(slug: string) {
+    const localPreview = await this.portfolioPreviewLiveService.readStoredPreview(slug);
+    if (localPreview) {
+      this.portfolio.set(localPreview);
+      this.notFound.set(false);
+      this.startCarouselAutoplay();
+    }
+    this.isLoading.set(false);
   }
 
   protected trackModule(index: number, module: RenderableModule) {
@@ -135,7 +177,8 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
 
   protected getTextModuleStyle(module: RenderableModule) {
     const textStyle = resolveTextStyle(module.type as ContentType, module.textStyle);
-    const textEffects = this.getTextContrastEffects(textStyle.textColor);
+    const textEffects =
+      module.type === 'table' ? this.getNoTextEffects() : this.getTextContrastEffects(textStyle.textColor);
     const style: Record<string, string> = {
       '--text-font-size': `${textStyle.fontSize}px`,
       '--text-align': textStyle.textAlign,
@@ -144,6 +187,10 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
       '--text-font-weight': textStyle.bold ? '700' : '400',
       '--text-font-style': textStyle.italic ? 'italic' : 'normal',
       '--table-border-width': `${textStyle.tableBorderWidth}px`,
+      '--table-border-color': textStyle.tableBorderColor,
+      '--table-cell-background-color': textStyle.tableCellBackgroundColor,
+      '--table-header-background-color': textStyle.tableHeaderBackgroundColor,
+      '--table-text-color': textStyle.textColor || '#151713',
       '--text-shadow': textEffects.shadow,
       '--text-stroke-width': textEffects.strokeWidth,
       '--text-stroke-color': textEffects.strokeColor,
@@ -181,6 +228,14 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
 
     return {
       shadow: '0 1px 1px rgba(0, 0, 0, 0.56), 0 0 18px rgba(0, 0, 0, 0.24)',
+      strokeWidth: '0px',
+      strokeColor: 'transparent',
+    };
+  }
+
+  private getNoTextEffects() {
+    return {
+      shadow: 'none',
       strokeWidth: '0px',
       strokeColor: 'transparent',
     };
@@ -313,6 +368,16 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
     }));
   }
 
+  protected getShareLink(module: RenderableModule, platformId: SharePlatformOption['id']) {
+    const shareValue =
+      parseShareEntries(module.value).find((entry) => entry.platformId === platformId)?.value ?? '';
+    return resolveSharePlatformHref(platformId, shareValue);
+  }
+
+  protected hasShareLinks(module: RenderableModule) {
+    return this.sharePlatforms.some((platform) => Boolean(this.getShareLink(module, platform.id)));
+  }
+
   private startCarouselAutoplay() {
     if (!this.isBrowser || this.autoplayIntervalId !== null) {
       return;
@@ -351,6 +416,26 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
 
     window.clearInterval(this.autoplayIntervalId);
     this.autoplayIntervalId = null;
+  }
+
+  private recordPortfolioViewWhenAllowed() {
+    if (
+      !this.isBrowser ||
+      this.hasRecordedView ||
+      this.isPreviewMode ||
+      !this.currentSlug ||
+      !this.portfolio() ||
+      !this.cookieConsentService.hasAccepted()
+    ) {
+      return;
+    }
+
+    this.hasRecordedView = true;
+    this.authApiService.recordPublicPortfolioView(this.currentSlug).subscribe({
+      error: () => {
+        this.hasRecordedView = false;
+      },
+    });
   }
 
   private buildRenderableModules(modules: PortfolioModuleDto[]): RenderableModule[] {
@@ -401,6 +486,7 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
       type === 'quote' ||
       type === 'stats' ||
       type === 'cta' ||
+      type === 'share' ||
       type === 'cv' ||
       type === 'background'
     );
@@ -426,6 +512,8 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
         return { columnStart: 4, rowStart: 12, columnSpan: 24, rowSpan: 10 };
       case 'cta':
         return { columnStart: 6, rowStart: 26, columnSpan: 28, rowSpan: 6 };
+      case 'share':
+        return { columnStart: 8, rowStart: 28, columnSpan: 22, rowSpan: 8 };
       case 'cv':
         return { columnStart: 7, rowStart: 8, columnSpan: 24, rowSpan: 20 };
       case 'background':
@@ -442,7 +530,7 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
     const minColumnSpan =
       type === 'title'
         ? 12
-        : type === 'cta'
+        : type === 'cta' || type === 'share'
           ? 14
           : type === 'quote' || type === 'stats' || type === 'carousel' || type === 'code'
             ? 12
@@ -450,7 +538,7 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
     const minRowSpan =
       type === 'title'
         ? 6
-        : type === 'cta'
+        : type === 'cta' || type === 'share'
           ? 4
           : type === 'quote' || type === 'stats' || type === 'code'
             ? 6
@@ -557,33 +645,4 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
     return `${module.type}-${module.label}-${module.resolvedLayout.columnStart}-${module.resolvedLayout.rowStart}-${index}`;
   }
 
-  private readLocalPreview(slug: string): PortfolioPublicDto | null {
-    if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
-      return null;
-    }
-
-    const rawValue = window.localStorage.getItem(PORTFOLIO_PREVIEW_STORAGE_KEY);
-    if (!rawValue) {
-      return null;
-    }
-
-    try {
-      const parsedValue = JSON.parse(rawValue) as Partial<PortfolioPublicDto> & {
-        savedAt?: number;
-      };
-      if (parsedValue.slug !== slug) {
-        return null;
-      }
-
-      return {
-        id: parsedValue.id ?? '',
-        title: parsedValue.title ?? slug,
-        slug,
-        public: parsedValue.public ?? true,
-        modules: Array.isArray(parsedValue.modules) ? parsedValue.modules : [],
-      };
-    } catch {
-      return null;
-    }
-  }
 }

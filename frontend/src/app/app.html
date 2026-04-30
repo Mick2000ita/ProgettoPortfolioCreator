@@ -1,1 +1,25 @@
 <router-outlet />
+
+@if (cookieConsentService.shouldShowBanner()) {
+  <section class="cookie-consent" aria-label="Preferenze cookie">
+    <div>
+      <strong>Usiamo cookie solo con il tuo consenso</strong>
+      <p>
+        Prima del consenso non registriamo statistiche di visita e non carichiamo servizi esterni
+        come Google Login.
+      </p>
+      <a href="/privacy">Leggi l'informativa privacy</a>
+    </div>
+
+    <div class="cookie-actions" aria-label="Azioni consenso cookie">
+      <button type="button" class="cookie-button-secondary" (click)="cookieConsentService.reject()">
+        <i class="pi pi-times" aria-hidden="true"></i>
+        Rifiuta
+      </button>
+      <button type="button" class="cookie-button-primary" (click)="cookieConsentService.accept()">
+        <i class="pi pi-check" aria-hidden="true"></i>
+        Accetta
+      </button>
+    </div>
+  </section>
+}

@@ -1,0 +1,130 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #081111;
+  color: #f5efe2;
+}
+
+.privacy-shell {
+  display: grid;
+  gap: 2rem;
+  width: min(1080px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+}
+
+.privacy-hero {
+  display: grid;
+  gap: 1.4rem;
+  padding: clamp(1.4rem, 4vw, 3rem);
+  border: 1px solid rgba(245, 239, 226, 0.12);
+  border-radius: 1.2rem;
+  background:
+    linear-gradient(135deg, rgba(0, 91, 65, 0.32), rgba(24, 61, 61, 0.22)),
+    rgba(255, 255, 255, 0.04);
+}
+
+.privacy-hero span,
+.privacy-hero small {
+  color: #83d1b4;
+  font-weight: 700;
+}
+
+.privacy-hero h1 {
+  margin: 0.35rem 0 0;
+  font-size: clamp(2.4rem, 6vw, 5rem);
+  line-height: 0.98;
+}
+
+.privacy-hero p {
+  max-width: 70ch;
+  margin: 1rem 0 0;
+  color: rgba(245, 239, 226, 0.78);
+  line-height: 1.8;
+}
+
+.back-link,
+.privacy-content a {
+  color: #83d1b4;
+  text-decoration: none;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-self: start;
+  font-weight: 700;
+}
+
+.privacy-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.privacy-content article {
+  padding: clamp(1.1rem, 3vw, 1.6rem);
+  border: 1px solid rgba(245, 239, 226, 0.1);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.privacy-content h2 {
+  margin: 0 0 0.8rem;
+  font-size: 1.1rem;
+  color: #efe0bc;
+}
+
+.privacy-content p,
+.privacy-content li {
+  color: rgba(245, 239, 226, 0.78);
+  line-height: 1.75;
+}
+
+.privacy-content p {
+  margin: 0;
+}
+
+.privacy-content p + p {
+  margin-top: 0.8rem;
+}
+
+.privacy-content ul {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.notice {
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(247, 210, 109, 0.12);
+  border: 1px solid rgba(247, 210, 109, 0.22);
+}
+
+.cookie-preferences {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+
+.cookie-preferences button {
+  min-height: 2.45rem;
+  padding: 0 0.9rem;
+  border: 1px solid rgba(131, 209, 180, 0.38);
+  border-radius: 0.45rem;
+  background: rgba(131, 209, 180, 0.1);
+  color: #f5efe2;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .privacy-shell {
+    width: min(100% - 1rem, 1080px);
+    padding-top: 1rem;
+  }
+}
