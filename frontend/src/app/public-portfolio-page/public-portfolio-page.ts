@@ -9,7 +9,9 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { SliderModule } from 'primeng/slider';
 import {
   PortfolioBackgroundImageDto,
   AuthApiService,
@@ -53,9 +55,15 @@ interface StatRow {
   detail: string;
 }
 
+interface InterpolationMediaMetric {
+  image: HTMLImageElement;
+  media: HTMLElement;
+  observer?: ResizeObserver;
+}
+
 @Component({
   selector: 'app-public-portfolio-page',
-  imports: [NgStyle, RouterLink],
+  imports: [NgStyle, RouterLink, FormsModule, SliderModule],
   templateUrl: './public-portfolio-page.html',
   styleUrl: './public-portfolio-page.scss',
 })
@@ -67,11 +75,16 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
   private readonly portfolioPreviewLiveService = inject(PortfolioPreviewLiveService);
   private readonly isBrowser = isPlatformBrowser(this.platformId);
   private disconnectLivePreview: (() => void) | null = null;
+  private interpolationHintIntervalId: number | null = null;
+  private readonly interpolationMediaMetrics = new Map<string, InterpolationMediaMetric>();
 
   protected readonly portfolio = signal<PortfolioPublicDto | null>(null);
   protected readonly notFound = signal(false);
   protected readonly isLoading = signal(true);
   protected readonly carouselIndexes = signal<Record<string, number>>({});
+  protected readonly interpolationValues = signal<Record<string, number>>({});
+  protected readonly interpolationHintPulse = signal(false);
+  protected readonly interpolationImageWidths = signal<Record<string, string>>({});
   protected readonly backgroundFrame = signal(0);
   protected readonly sharePlatforms: SharePlatformOption[] = SHARE_PLATFORM_OPTIONS;
   protected readonly currentYear = new Date().getFullYear();
@@ -125,6 +138,7 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
     this.isPreviewMode = this.route.snapshot.queryParamMap.get('preview') === '1';
 
     if (this.isPreviewMode) {
+      this.startInterpolationHintAnimation();
       this.disconnectLivePreview = this.portfolioPreviewLiveService.connect(slug, (snapshot) => {
         this.portfolio.set(snapshot);
         this.notFound.set(false);
@@ -139,6 +153,7 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
       next: (portfolio) => {
         this.portfolio.set(portfolio);
         this.startCarouselAutoplay();
+        this.startInterpolationHintAnimation();
         this.isLoading.set(false);
         this.recordPortfolioViewWhenAllowed();
       },
@@ -152,6 +167,9 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.disconnectLivePreview?.();
     this.stopCarouselAutoplay();
+    this.stopInterpolationHintAnimation();
+    this.interpolationMediaMetrics.forEach((metric) => metric.observer?.disconnect());
+    this.interpolationMediaMetrics.clear();
   }
 
   private async loadStoredPreview(slug: string) {
@@ -334,6 +352,70 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
     return module.values?.[this.getCarouselSlide(module, index)] ?? '';
   }
 
+  protected getInterpolationValue(module: RenderableModule, index: number) {
+    const moduleKey = this.getModuleKey(index, module);
+    const savedValue = this.interpolationValues()[moduleKey];
+    if (typeof savedValue === 'number') {
+      return this.clampNumber(savedValue, 0, 100, 50);
+    }
+
+    return this.clampNumber(Number.parseFloat(module.value ?? ''), 0, 100, 50);
+  }
+
+  protected getInterpolationFramePair(module: RenderableModule, index: number) {
+    const images = module.values ?? [];
+    return this.getLinearInterpolationFramePair(images, this.getInterpolationValue(module, index));
+  }
+
+  protected updateInterpolationValue(
+    module: RenderableModule,
+    index: number,
+    value: number | null | undefined,
+  ) {
+    const moduleKey = this.getModuleKey(index, module);
+    const nextValue = this.clampNumber(value ?? Number.NaN, 0, 100, 50);
+
+    this.interpolationValues.update((currentValues) => ({
+      ...currentValues,
+      [moduleKey]: nextValue,
+    }));
+  }
+
+  protected getInterpolationImageWidth(module: RenderableModule, index: number) {
+    return this.interpolationImageWidths()[this.getModuleKey(index, module)] ?? '100%';
+  }
+
+  protected updateInterpolationMediaWidth(
+    module: RenderableModule,
+    index: number,
+    mediaElement: HTMLElement,
+    event: Event,
+  ) {
+    if (!this.isBrowser) {
+      return;
+    }
+
+    const imageElement = event.target as HTMLImageElement;
+    const moduleKey = this.getModuleKey(index, module);
+    const currentMetric = this.interpolationMediaMetrics.get(moduleKey);
+    currentMetric?.observer?.disconnect();
+
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? undefined
+        : new ResizeObserver(() => {
+            this.setInterpolationMediaWidth(moduleKey, mediaElement, imageElement);
+          });
+
+    observer?.observe(mediaElement);
+    this.interpolationMediaMetrics.set(moduleKey, {
+      image: imageElement,
+      media: mediaElement,
+      observer,
+    });
+    this.setInterpolationMediaWidth(moduleKey, mediaElement, imageElement);
+  }
+
   protected getBackgroundImageStyle(image: PortfolioBackgroundImageDto) {
     return {
       left: `${image.positionX ?? 50}%`,
@@ -418,6 +500,49 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
     this.autoplayIntervalId = null;
   }
 
+  private startInterpolationHintAnimation() {
+    if (!this.isBrowser || this.interpolationHintIntervalId !== null) {
+      return;
+    }
+
+    this.interpolationHintIntervalId = window.setInterval(() => {
+      this.interpolationHintPulse.update((value) => !value);
+    }, 1400);
+  }
+
+  private stopInterpolationHintAnimation() {
+    if (this.interpolationHintIntervalId === null) {
+      return;
+    }
+
+    window.clearInterval(this.interpolationHintIntervalId);
+    this.interpolationHintIntervalId = null;
+  }
+
+  private setInterpolationMediaWidth(
+    moduleKey: string,
+    mediaElement: HTMLElement,
+    imageElement: HTMLImageElement,
+  ) {
+    const mediaRect = mediaElement.getBoundingClientRect();
+    const naturalWidth = imageElement.naturalWidth;
+    const naturalHeight = imageElement.naturalHeight;
+
+    if (!mediaRect.width || !mediaRect.height || !naturalWidth || !naturalHeight) {
+      return;
+    }
+
+    const mediaRatio = mediaRect.width / mediaRect.height;
+    const imageRatio = naturalWidth / naturalHeight;
+    const containedWidth =
+      imageRatio >= mediaRatio ? mediaRect.width : mediaRect.height * imageRatio;
+
+    this.interpolationImageWidths.update((currentWidths) => ({
+      ...currentWidths,
+      [moduleKey]: `${Math.round(containedWidth)}px`,
+    }));
+  }
+
   private recordPortfolioViewWhenAllowed() {
     if (
       !this.isBrowser ||
@@ -482,6 +607,7 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
       type === 'code' ||
       type === 'image' ||
       type === 'carousel' ||
+      type === 'interpolation' ||
       type === 'table' ||
       type === 'quote' ||
       type === 'stats' ||
@@ -503,6 +629,8 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
       case 'image':
         return { columnStart: 22, rowStart: 12, columnSpan: 18, rowSpan: 16 };
       case 'carousel':
+        return { columnStart: 19, rowStart: 12, columnSpan: 22, rowSpan: 18 };
+      case 'interpolation':
         return { columnStart: 19, rowStart: 12, columnSpan: 22, rowSpan: 18 };
       case 'table':
         return { columnStart: 5, rowStart: 20, columnSpan: 22, rowSpan: 14 };
@@ -532,7 +660,11 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
         ? 12
         : type === 'cta' || type === 'share'
           ? 14
-          : type === 'quote' || type === 'stats' || type === 'carousel' || type === 'code'
+          : type === 'quote' ||
+              type === 'stats' ||
+              type === 'carousel' ||
+              type === 'interpolation' ||
+              type === 'code'
             ? 12
             : 10;
     const minRowSpan =
@@ -615,6 +747,41 @@ export class PublicPortfolioPage implements OnInit, OnDestroy {
       typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : fallback;
 
     return Math.min(max, Math.max(min, normalizedValue));
+  }
+
+  private clampNumber(value: number, min: number, max: number, fallback: number) {
+    const normalizedValue = Number.isFinite(value) ? value : fallback;
+    return Math.min(max, Math.max(min, normalizedValue));
+  }
+
+  private getLinearInterpolationFramePair(images: string[], value: number) {
+    if (images.length === 0) {
+      return null;
+    }
+
+    if (images.length === 1) {
+      return {
+        before: images[0],
+        after: images[0],
+        alpha: 0,
+        beforeIndex: 0,
+        afterIndex: 0,
+      };
+    }
+
+    const lastIndex = images.length - 1;
+    const scaledValue = (this.clampNumber(value, 0, 100, 50) / 100) * lastIndex;
+    const beforeIndex =
+      scaledValue >= lastIndex ? Math.max(lastIndex - 1, 0) : Math.floor(scaledValue);
+    const afterIndex = Math.min(beforeIndex + 1, lastIndex);
+
+    return {
+      before: images[beforeIndex],
+      after: images[afterIndex],
+      alpha: this.clampNumber(scaledValue - beforeIndex, 0, 1, 0),
+      beforeIndex,
+      afterIndex,
+    };
   }
 
   private getTextJustify(textAlign: EditorNodeTextStyle['textAlign']) {

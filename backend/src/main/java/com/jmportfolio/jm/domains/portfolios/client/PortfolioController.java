@@ -21,6 +21,8 @@ import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioAnalyticsDto;
 import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioPublicDto;
 import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioSlugAvailabilityDto;
 import com.jmportfolio.jm.domains.portfolios.client.dto.PortfolioSummaryDto;
+import com.jmportfolio.jm.domains.portfolios.client.dto.UpdatePortfolioDescriptionRequestDto;
+import com.jmportfolio.jm.domains.portfolios.client.dto.UpdatePortfolioDiscoveryPreferencesRequestDto;
 import com.jmportfolio.jm.domains.portfolios.client.dto.UpdatePortfolioTagsRequestDto;
 import com.jmportfolio.jm.domains.portfolios.client.dto.UpdatePortfolioVisibilityRequestDto;
 
@@ -81,6 +83,15 @@ public class PortfolioController {
                 request.isPublic());
     }
 
+    @PutMapping("/{slug}/discovery-preferences")
+    public PortfolioSummaryDto updatePortfolioDiscoveryPreferences(
+            @AuthenticationPrincipal ExtendedAuthUser authenticatedUser,
+            @PathVariable String slug,
+            @RequestBody UpdatePortfolioDiscoveryPreferencesRequestDto request) {
+        return portfolioService.updatePortfolioDiscoveryPreferences(authenticatedUser.getUsername(),
+                slug, request.isShowHomeSnapshot(), request.isShowInExplore());
+    }
+
     @PutMapping("/{slug}/tags")
     public PortfolioSummaryDto updatePortfolioTags(
             @AuthenticationPrincipal ExtendedAuthUser authenticatedUser,
@@ -90,11 +101,25 @@ public class PortfolioController {
                 request.getTags());
     }
 
+    @PutMapping("/{slug}/description")
+    public PortfolioSummaryDto updatePortfolioDescription(
+            @AuthenticationPrincipal ExtendedAuthUser authenticatedUser,
+            @PathVariable String slug,
+            @RequestBody UpdatePortfolioDescriptionRequestDto request) {
+        return portfolioService.updatePortfolioDescription(authenticatedUser.getUsername(), slug,
+                request.getDescription());
+    }
+
     @DeleteMapping("/{slug}")
     public void deletePortfolio(
             @AuthenticationPrincipal ExtendedAuthUser authenticatedUser,
             @PathVariable String slug) {
         portfolioService.deletePortfolio(authenticatedUser.getUsername(), slug);
+    }
+
+    @GetMapping("/public/home-snapshots/list")
+    public List<PortfolioPublicDto> getHomeSnapshotPortfolios() {
+        return portfolioService.getHomeSnapshotPortfolios();
     }
 
     @GetMapping("/public/{slug}")

@@ -43,10 +43,20 @@ export interface UpdatePortfolioTagsRequestDto {
   tags: string[];
 }
 
+export interface UpdatePortfolioDescriptionRequestDto {
+  description: string;
+}
+
+export interface UpdatePortfolioDiscoveryPreferencesRequestDto {
+  showHomeSnapshot: boolean;
+  showInExplore: boolean;
+}
+
 export interface UserPortfolioSummaryDto {
   id: string;
   title: string;
   slug: string;
+  description?: string | null;
   tags: string[];
   public: boolean;
   showHomeSnapshot?: boolean;
@@ -128,6 +138,7 @@ export interface PortfolioModuleDto {
 export interface CreatePortfolioRequestDto {
   title: string;
   slug?: string;
+  description?: string | null;
   tags?: string[];
   modules: PortfolioModuleDto[];
   showHomeSnapshot?: boolean;
@@ -144,6 +155,7 @@ export interface PortfolioPublicDto {
   id: string;
   title: string;
   slug: string;
+  description?: string | null;
   tags: string[];
   public: boolean;
   showHomeSnapshot?: boolean;
@@ -237,6 +249,16 @@ export class AuthApiService {
     );
   }
 
+  updatePortfolioDiscoveryPreferences(
+    slug: string,
+    payload: UpdatePortfolioDiscoveryPreferencesRequestDto,
+  ): Observable<UserPortfolioSummaryDto> {
+    return this.http.put<UserPortfolioSummaryDto>(
+      `${this.apiUrl}/api/portfolios/${slug}/discovery-preferences`,
+      payload,
+    );
+  }
+
   updatePortfolioTags(
     slug: string,
     payload: UpdatePortfolioTagsRequestDto,
@@ -247,12 +269,28 @@ export class AuthApiService {
     );
   }
 
+  updatePortfolioDescription(
+    slug: string,
+    payload: UpdatePortfolioDescriptionRequestDto,
+  ): Observable<UserPortfolioSummaryDto> {
+    return this.http.put<UserPortfolioSummaryDto>(
+      `${this.apiUrl}/api/portfolios/${slug}/description`,
+      payload,
+    );
+  }
+
   deletePortfolio(slug: string): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/api/portfolios/${slug}`);
   }
 
   getPublicPortfolio(slug: string): Observable<PortfolioPublicDto> {
     return this.http.get<PortfolioPublicDto>(`${this.apiUrl}/api/portfolios/public/${slug}`);
+  }
+
+  getHomeSnapshotPortfolios(): Observable<PortfolioPublicDto[]> {
+    return this.http.get<PortfolioPublicDto[]>(
+      `${this.apiUrl}/api/portfolios/public/home-snapshots/list`,
+    );
   }
 
   recordPublicPortfolioView(slug: string): Observable<void> {

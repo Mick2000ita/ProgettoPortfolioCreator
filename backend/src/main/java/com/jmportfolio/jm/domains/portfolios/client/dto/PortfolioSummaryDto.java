@@ -12,6 +12,7 @@ public class PortfolioSummaryDto {
     private UUID id;
     private String title;
     private String slug;
+    private String description;
     private List<String> tags;
     private boolean isPublic;
     private boolean showHomeSnapshot;

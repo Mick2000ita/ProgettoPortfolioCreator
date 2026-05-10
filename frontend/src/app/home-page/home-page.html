@@ -1,8 +1,8 @@
-<div class="home-shell" [class.home-shell-dashboard]="isAuthenticated()">
-  @if (isAuthenticated()) {
+<div class="home-shell" [class.home-shell-dashboard]="isAnalyticsPage()">
+  @if (isAnalyticsPage()) {
     <section class="dashboard-hero">
       <div class="dashboard-copy">
-        <div class="eyebrow">Dashboard</div>
+        <div class="eyebrow">Analytics</div>
         <h1>Ciao {{ user()?.username || 'creator' }}, ecco come stanno andando i portfolio.</h1>
         <p>
           Una vista pulita su portfolio attivi, pubblicazione, visualizzazioni e andamento degli
@@ -47,7 +47,9 @@
           <i class="metric-background-icon pi pi-briefcase" aria-hidden="true"></i>
           <strong>{{ portfolioStats().total }}</strong>
           <span>portfolio totali</span>
-          <small>{{ portfolioStats().public }} pubblici, {{ portfolioStats().private }} privati</small>
+          <small
+            >{{ portfolioStats().public }} pubblici, {{ portfolioStats().private }} privati</small
+          >
         </p-card>
 
         <p-card styleClass="metric-card metric-card-with-bg-icon">
@@ -99,9 +101,17 @@
                 <polyline class="trend-line" [attr.points]="trendChart().linePoints"></polyline>
 
                 @for (point of trendChart().points; track point.month) {
-                  <circle class="trend-point-halo" [attr.cx]="point.x" [attr.cy]="point.y" r="3.2" />
+                  <circle
+                    class="trend-point-halo"
+                    [attr.cx]="point.x"
+                    [attr.cy]="point.y"
+                    r="3.2"
+                  />
                   <circle class="trend-point" [attr.cx]="point.x" [attr.cy]="point.y" r="1.6" />
-                  <g class="trend-value-marker" [attr.transform]="'translate(' + point.x + ' ' + point.labelY + ')'">
+                  <g
+                    class="trend-value-marker"
+                    [attr.transform]="'translate(' + point.x + ' ' + point.labelY + ')'"
+                  >
                     <rect x="-4.4" y="-6.5" width="8.8" height="5.2" rx="2.6"></rect>
                     <text y="-2.9" text-anchor="middle">{{ point.views }}</text>
                   </g>
@@ -184,8 +194,8 @@
         </p>
 
         <div class="hero-actions">
-          <a routerLink="/login" class="action-link">
-            <p-button label="Inizia ora" icon="pi pi-sign-in" />
+          <a [routerLink]="primaryActionLink()" class="action-link">
+            <p-button [label]="primaryActionLabel()" [icon]="primaryActionIcon()" />
           </a>
           <a href="#workflow" class="secondary-link">Vedi come funziona</a>
         </div>
@@ -200,56 +210,104 @@
         </div>
       </div>
 
-      <div class="builder-preview" aria-label="Preview dell'editor portfolio">
-        <div class="preview-topbar">
+      <div class="hero-showcase" aria-label="Preview portfolio minimal">
+        <div class="showcase-topbar">
           <span></span>
           <span></span>
           <span></span>
-          <strong>/marco-rinaldi</strong>
+          <strong>portfolio.app/sara-rossi</strong>
         </div>
 
-        <div class="preview-workspace">
-          <aside class="preview-sidebar">
-            <span class="sidebar-pill">Editor</span>
-            <strong>Gerarchia</strong>
-            <div class="sidebar-node sidebar-node-active">Hero title</div>
-            <div class="sidebar-node">Stats</div>
-            <div class="sidebar-node">Carousel</div>
-            <div class="sidebar-node">CTA finale</div>
-          </aside>
+        <div class="showcase-panel">
+          <div class="showcase-copy">
+            <span>Portfolio tecnico</span>
+            <strong>Sara Rossi</strong>
+            <p>Case study, stack e progetti selezionati in una pagina pubblica essenziale.</p>
+          </div>
 
-          <section class="preview-canvas">
-            <article class="canvas-block canvas-title">
-              <span>Frontend Engineer</span>
-              <strong>Code and Craft</strong>
-            </article>
-            <article class="canvas-block canvas-image"></article>
-            <article class="canvas-block canvas-stats">
-              <strong>42%</strong>
-              <span>Conversion uplift</span>
-            </article>
-            <article class="canvas-block canvas-copy">
-              Portfolio tecnico con casi studio, metriche e component library personale.
-            </article>
-          </section>
+          <div class="showcase-visual" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
 
-          <aside class="preview-inspector">
-            <span class="sidebar-pill">Inspector</span>
-            <label>Colore pagina</label>
-            <div class="color-line"></div>
-            <label>Modulo</label>
-            <div class="format-row">
-              <span>B</span>
-              <span>Center</span>
+        <div class="showcase-modules">
+          <article>
+            <i class="pi pi-sitemap" aria-hidden="true"></i>
+            <strong>Layout</strong>
+            <span>Griglia pronta</span>
+          </article>
+          <article>
+            <i class="pi pi-images" aria-hidden="true"></i>
+            <strong>Media</strong>
+            <span>Immagini e gallery</span>
+          </article>
+          <article>
+            <i class="pi pi-send" aria-hidden="true"></i>
+            <strong>Pubblica</strong>
+            <span>URL condivisibile</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-snapshot-section" aria-label="Portfolio in evidenza nella Home">
+      <div class="section-heading">
+        <div class="eyebrow">Snap Home</div>
+        <h2>Profili che potrebbero interessarti.</h2>
+      </div>
+
+      <div class="snapshot-grid" [class.snapshot-grid-loading]="isLoadingHomeSnapshots()">
+        @for (snapshot of homeSnapshotCards(); track snapshot.id) {
+          <article
+            class="snapshot-card"
+            [class.snapshot-card-placeholder]="snapshot.placeholder"
+            [style.--snapshot-accent]="snapshot.accent"
+          >
+            <div class="snapshot-media" [class.snapshot-media-empty]="!snapshot.imageUrl">
+              @if (snapshot.imageUrl) {
+                <img [src]="snapshot.imageUrl" [alt]="snapshot.title" />
+              } @else {
+                <div class="snapshot-miniature" aria-hidden="true">
+                  @for (line of snapshot.featureLines; track line; let lineIndex = $index) {
+                    <span [style.width]="getSnapshotFeatureWidth(lineIndex)"></span>
+                  }
+                </div>
+              }
             </div>
-          </aside>
-        </div>
 
-        <div class="preview-toolbar">
-          @for (tool of editorTools.slice(0, 7); track tool.value) {
-            <span><i [class]="tool.icon"></i>{{ tool.label }}</span>
-          }
-        </div>
+            <div class="snapshot-body">
+              <div class="snapshot-tags">
+                @for (tag of snapshot.tags; track tag) {
+                  <span>{{ tag }}</span>
+                }
+              </div>
+
+              <h3>{{ snapshot.title }}</h3>
+              <p>{{ snapshot.description }}</p>
+
+              <div class="snapshot-lines" aria-label="Moduli principali">
+                @for (line of snapshot.featureLines; track line) {
+                  <span>{{ line }}</span>
+                }
+              </div>
+
+              <div class="snapshot-footer">
+                <span>{{ snapshot.modulesCount }} moduli</span>
+
+                @if (!snapshot.placeholder) {
+                  <a [routerLink]="['/', snapshot.slug]" aria-label="Apri portfolio pubblico">
+                    <i class="pi pi-window-maximize" aria-hidden="true"></i>
+                    Apri
+                  </a>
+                } @else {
+                  <small>Slot libero</small>
+                }
+              </div>
+            </div>
+          </article>
+        }
       </div>
     </section>
 
@@ -316,9 +374,9 @@
 
       <div class="slug-card">
         <span>URL pubblico</span>
-        <strong>portfolio.app/marco-rinaldi</strong>
-        <a routerLink="/login" class="action-link">
-          <p-button label="Costruisci il tuo" icon="pi pi-arrow-right" />
+        <strong>portfolio.app/mario-bianchi</strong>
+        <a [routerLink]="primaryActionLink()" class="action-link">
+          <p-button [label]="primaryActionLabel()" icon="pi pi-arrow-right" />
         </a>
       </div>
     </section>

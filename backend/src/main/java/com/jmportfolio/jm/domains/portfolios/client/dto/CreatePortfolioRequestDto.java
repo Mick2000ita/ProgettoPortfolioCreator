@@ -17,6 +17,8 @@ public class CreatePortfolioRequestDto {
 
     private String slug;
 
+    private String description;
+
     private List<String> tags;
 
     private List<Map<String, Object>> modules;

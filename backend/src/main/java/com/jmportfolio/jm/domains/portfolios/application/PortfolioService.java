@@ -40,6 +40,7 @@ import jakarta.transaction.Transactional;
 public class PortfolioService {
     private static final List<String> RESERVED_SLUGS =
             List.of("login", "home", "profile", "portfolios", "api");
+    private static final int DESCRIPTION_LIMIT = 180;
 
     @Autowired
     private PortfolioRepository portfolioRepository;
@@ -70,6 +71,7 @@ public class PortfolioService {
         Portfolio portfolio = new Portfolio();
         portfolio.setTitle(title);
         portfolio.setSlug(slug);
+        portfolio.setDescription(normalizeDescription(request.getDescription()));
         portfolio.setTags(tags);
         portfolio.setShowHomeSnapshot(resolvePreference(request.getShowHomeSnapshot(), true));
         portfolio.setShowInExplore(resolvePreference(request.getShowInExplore(), false));
@@ -111,6 +113,9 @@ public class PortfolioService {
 
         existingPortfolio.setTitle(title);
         existingPortfolio.setSlug(slug);
+        if (request.getDescription() != null) {
+            existingPortfolio.setDescription(normalizeDescription(request.getDescription()));
+        }
         existingPortfolio.setTags(tags);
         existingPortfolio.setPublicData(new ArrayList<>(modules));
         existingPortfolio.setWipData(new ArrayList<>(modules));
@@ -132,6 +137,7 @@ public class PortfolioService {
                         portfolio.getId(),
                         portfolio.getTitle(),
                         portfolio.getSlug(),
+                        portfolio.getDescription(),
                         safeTags(portfolio.getTags()),
                         portfolio.isPublic(),
                         portfolio.isShowHomeSnapshot(),
@@ -186,6 +192,7 @@ public class PortfolioService {
                         portfolio.getId(),
                         portfolio.getTitle(),
                         portfolio.getSlug(),
+                        portfolio.getDescription(),
                         safeTags(portfolio.getTags()),
                         portfolio.isPublic(),
                         portfolio.isShowHomeSnapshot(),
@@ -218,6 +225,12 @@ public class PortfolioService {
         return toPublicDto(portfolio);
     }
 
+    public List<PortfolioPublicDto> getHomeSnapshotPortfolios() {
+        return portfolioRepository.findHomeSnapshotPortfolios().stream()
+                .map(this::toPublicDto)
+                .toList();
+    }
+
     public void trackPublicPortfolioView(String slug) {
         Portfolio portfolio = portfolioRepository.findPublicBySlug(slug)
                 .orElseThrow(() -> new ApplicationException("Portfolio not found",
@@ -243,6 +256,34 @@ public class PortfolioService {
                 savedPortfolio.getId(),
                 savedPortfolio.getTitle(),
                 savedPortfolio.getSlug(),
+                savedPortfolio.getDescription(),
+                safeTags(savedPortfolio.getTags()),
+                savedPortfolio.isPublic(),
+                savedPortfolio.isShowHomeSnapshot(),
+                savedPortfolio.isShowInExplore());
+    }
+
+    public PortfolioSummaryDto updatePortfolioDiscoveryPreferences(String username, String slug,
+            boolean showHomeSnapshot, boolean showInExplore) {
+        Portfolio portfolio = portfolioRepository.findBySlugAndUsername(slug, username)
+                .orElseThrow(() -> new ApplicationException("Portfolio not found",
+                        "PORTFOLIO_NOT_FOUND"));
+
+        User user = userRepository.findByUsername(username);
+        if (user == null) {
+            throw new ApplicationException("User not found", "USER_NOT_FOUND");
+        }
+
+        portfolio.setShowHomeSnapshot(showHomeSnapshot);
+        portfolio.setShowInExplore(showInExplore);
+        portfolio.setUser(user);
+        Portfolio savedPortfolio = portfolioRepository.save(portfolio);
+
+        return new PortfolioSummaryDto(
+                savedPortfolio.getId(),
+                savedPortfolio.getTitle(),
+                savedPortfolio.getSlug(),
+                savedPortfolio.getDescription(),
                 safeTags(savedPortfolio.getTags()),
                 savedPortfolio.isPublic(),
                 savedPortfolio.isShowHomeSnapshot(),
@@ -267,6 +308,32 @@ public class PortfolioService {
                 savedPortfolio.getId(),
                 savedPortfolio.getTitle(),
                 savedPortfolio.getSlug(),
+                savedPortfolio.getDescription(),
+                safeTags(savedPortfolio.getTags()),
+                savedPortfolio.isPublic(),
+                savedPortfolio.isShowHomeSnapshot(),
+                savedPortfolio.isShowInExplore());
+    }
+
+    public PortfolioSummaryDto updatePortfolioDescription(String username, String slug, String description) {
+        Portfolio portfolio = portfolioRepository.findBySlugAndUsername(slug, username)
+                .orElseThrow(() -> new ApplicationException("Portfolio not found",
+                        "PORTFOLIO_NOT_FOUND"));
+
+        User user = userRepository.findByUsername(username);
+        if (user == null) {
+            throw new ApplicationException("User not found", "USER_NOT_FOUND");
+        }
+
+        portfolio.setDescription(normalizeDescription(description));
+        portfolio.setUser(user);
+        Portfolio savedPortfolio = portfolioRepository.save(portfolio);
+
+        return new PortfolioSummaryDto(
+                savedPortfolio.getId(),
+                savedPortfolio.getTitle(),
+                savedPortfolio.getSlug(),
+                savedPortfolio.getDescription(),
                 safeTags(savedPortfolio.getTags()),
                 savedPortfolio.isPublic(),
                 savedPortfolio.isShowHomeSnapshot(),
@@ -295,6 +362,7 @@ public class PortfolioService {
                 portfolio.getId(),
                 portfolio.getTitle(),
                 portfolio.getSlug(),
+                portfolio.getDescription(),
                 safeTags(portfolio.getTags()),
                 portfolio.isPublic(),
                 portfolio.isShowHomeSnapshot(),
@@ -317,6 +385,17 @@ public class PortfolioService {
 
     private List<String> safeTags(List<String> tags) {
         return tags == null ? List.of() : tags;
+    }
+
+    private String normalizeDescription(String description) {
+        if (!hasText(description)) {
+            return null;
+        }
+
+        String compactDescription = description.trim().replaceAll("\\s+", " ");
+        return compactDescription.length() > DESCRIPTION_LIMIT
+                ? compactDescription.substring(0, DESCRIPTION_LIMIT).trim()
+                : compactDescription;
     }
 
     private List<Map<String, Object>> normalizeModules(List<Map<String, Object>> modules) {

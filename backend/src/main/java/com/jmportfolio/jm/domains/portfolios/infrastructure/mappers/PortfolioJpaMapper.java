@@ -15,6 +15,7 @@ public class PortfolioJpaMapper {
         model.setId(entity.getId());
         model.setTitle(entity.getTitle());
         model.setSlug(entity.getSlug());
+        model.setDescription(entity.getDescription());
         model.setTags(entity.getTags() == null ? List.of() : entity.getTags());
         model.setPublicData(entity.getPublicData());
         model.setWipData(entity.getWipData());
@@ -35,6 +36,7 @@ public class PortfolioJpaMapper {
         }
         entity.setTitle(model.getTitle());
         entity.setSlug(model.getSlug());
+        entity.setDescription(model.getDescription());
         entity.setTags(model.getTags() == null ? List.of() : model.getTags());
         entity.setPublicData(model.getPublicData());
         entity.setWipData(model.getWipData());

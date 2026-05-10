@@ -1,19 +1,94 @@
 import { isPlatformBrowser } from '@angular/common';
-import { Component, DestroyRef, OnInit, PLATFORM_ID, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import {
+  Component,
+  DestroyRef,
+  OnInit,
+  PLATFORM_ID,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import {
   AuthApiService,
   PortfolioAnalyticsDto,
+  PortfolioModuleDto,
   PortfolioMonthlyViewsDto,
+  PortfolioPublicDto,
   PortfolioViewSummaryDto,
 } from '../services/auth-api.service';
 import { AuthSessionService } from '../services/auth-session.service';
-import {
-  PORTFOLIO_EDITOR_CONTENT_OPTIONS,
-  PORTFOLIO_LAYOUT_TEMPLATES,
-} from '../services/portfolio-editor-state.service';
+import { PORTFOLIO_LAYOUT_TEMPLATES } from '../services/portfolio-editor-state.service';
+
+interface HomeSnapshotCard {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  tags: string[];
+  featureLines: string[];
+  imageUrl: string;
+  accent: string;
+  modulesCount: number;
+  placeholder: boolean;
+}
+
+type HomePageMode = 'landing' | 'analytics';
+
+const HOME_SNAPSHOT_LIMIT = 4;
+const HOME_SNAPSHOT_PLACEHOLDERS: HomeSnapshotCard[] = [
+  {
+    id: 'placeholder-studio',
+    title: 'Portfolio in arrivo',
+    slug: '',
+    description: 'Uno spazio pronto per il prossimo creator che attivera lo snap in Home.',
+    tags: ['Case study', 'Design'],
+    featureLines: ['Hero visuale', 'Progetti selezionati', 'Contatti rapidi'],
+    imageUrl: '',
+    accent: '#f7d26d',
+    modulesCount: 6,
+    placeholder: true,
+  },
+  {
+    id: 'placeholder-dev',
+    title: 'Showcase tecnico',
+    slug: '',
+    description: 'Placeholder per portfolio pubblici con codice, metriche e lavoro reale.',
+    tags: ['Frontend', 'Code'],
+    featureLines: ['Stack', 'Snippet', 'Metriche'],
+    imageUrl: '',
+    accent: '#83d1b4',
+    modulesCount: 5,
+    placeholder: true,
+  },
+  {
+    id: 'placeholder-visual',
+    title: 'Racconto visuale',
+    slug: '',
+    description: 'Una preview di riserva mentre non ci sono abbastanza snap da mostrare.',
+    tags: ['Visual', 'Story'],
+    featureLines: ['Gallery', 'Processo', 'CTA finale'],
+    imageUrl: '',
+    accent: '#d87f47',
+    modulesCount: 7,
+    placeholder: true,
+  },
+  {
+    id: 'placeholder-brand',
+    title: 'Profilo creativo',
+    slug: '',
+    description: 'Card segnaposto con la stessa densita delle anteprime reali.',
+    tags: ['Brand', 'Portfolio'],
+    featureLines: ['Bio', 'Risultati', 'Link social'],
+    imageUrl: '',
+    accent: '#c0efe1',
+    modulesCount: 4,
+    placeholder: true,
+  },
+];
 
 @Component({
   selector: 'app-home-page',
@@ -24,16 +99,26 @@ import {
 export class HomePage implements OnInit {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute);
   private readonly authSessionService = inject(AuthSessionService);
   private readonly authApiService = inject(AuthApiService);
   private isAnalyticsRequestInFlight = false;
+  private hasRegisteredAnalyticsRefresh = false;
 
   protected readonly user = this.authSessionService.user;
   protected readonly isAuthenticated = this.authSessionService.authenticated;
-  protected readonly layoutTemplates = PORTFOLIO_LAYOUT_TEMPLATES;
-  protected readonly editorTools = PORTFOLIO_EDITOR_CONTENT_OPTIONS.filter(
-    (option) => option.value !== 'background',
+  protected readonly pageMode = signal<HomePageMode>('landing');
+  protected readonly isAnalyticsPage = computed(() => this.pageMode() === 'analytics');
+  protected readonly primaryActionLink = computed(() =>
+    this.isAuthenticated() ? '/portfolios/new' : '/login',
   );
+  protected readonly primaryActionLabel = computed(() =>
+    this.isAuthenticated() ? 'Crea portfolio' : 'Inizia ora',
+  );
+  protected readonly primaryActionIcon = computed(() =>
+    this.isAuthenticated() ? 'pi pi-plus' : 'pi pi-sign-in',
+  );
+  protected readonly layoutTemplates = PORTFOLIO_LAYOUT_TEMPLATES;
   protected readonly workflowSteps = [
     {
       kicker: '01',
@@ -52,7 +137,7 @@ export class HomePage implements OnInit {
     {
       kicker: '03',
       title: 'Pubblica su slug',
-      description: 'Salva il portfolio e condividilo con un URL pulito come /marco-rinaldi.',
+      description: 'Salva il portfolio e condividilo con un URL pulito come /sara-rossi.',
       icon: 'pi pi-send',
     },
   ];
@@ -62,6 +147,19 @@ export class HomePage implements OnInit {
     { value: '/slug', label: 'pagina pubblica' },
   ];
 
+  protected readonly homeSnapshots = signal<PortfolioPublicDto[]>([]);
+  protected readonly isLoadingHomeSnapshots = signal(false);
+  protected readonly homeSnapshotCards = computed<HomeSnapshotCard[]>(() => {
+    const realCards = this.homeSnapshots()
+      .slice(0, HOME_SNAPSHOT_LIMIT)
+      .map((portfolio, index) => this.toHomeSnapshotCard(portfolio, index));
+    const placeholders = HOME_SNAPSHOT_PLACEHOLDERS.slice(
+      0,
+      HOME_SNAPSHOT_LIMIT - realCards.length,
+    );
+
+    return [...realCards, ...placeholders];
+  });
   protected readonly analytics = signal<PortfolioAnalyticsDto | null>(null);
   protected readonly isLoadingAnalytics = signal(false);
   protected readonly loadError = signal('');
@@ -151,17 +249,30 @@ export class HomePage implements OnInit {
       viewBox: '0 0 100 60',
     };
   });
-  protected readonly bestPortfolio = computed(() =>
-    [...this.portfolioViews()].sort((first, second) => second.totalViews - first.totalViews)[0],
+  protected readonly bestPortfolio = computed(
+    () =>
+      [...this.portfolioViews()].sort((first, second) => second.totalViews - first.totalViews)[0],
   );
 
   ngOnInit() {
-    if (!isPlatformBrowser(this.platformId) || !this.isAuthenticated()) {
+    if (!isPlatformBrowser(this.platformId)) {
       return;
     }
 
-    this.loadAnalytics();
-    this.refreshAnalyticsWhenPageBecomesActive();
+    this.route.data.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((data) => {
+      this.pageMode.set(data['page'] === 'analytics' ? 'analytics' : 'landing');
+      this.loadCurrentPageData();
+    });
+  }
+
+  private loadCurrentPageData() {
+    if (this.isAnalyticsPage()) {
+      this.loadAnalytics();
+      this.refreshAnalyticsWhenPageBecomesActive();
+      return;
+    }
+
+    this.loadHomeSnapshots();
   }
 
   private loadAnalytics() {
@@ -186,15 +297,37 @@ export class HomePage implements OnInit {
     });
   }
 
+  private loadHomeSnapshots() {
+    this.isLoadingHomeSnapshots.set(true);
+    this.authApiService.getHomeSnapshotPortfolios().subscribe({
+      next: (portfolios) => {
+        this.homeSnapshots.set(portfolios ?? []);
+        this.isLoadingHomeSnapshots.set(false);
+      },
+      error: () => {
+        this.homeSnapshots.set([]);
+        this.isLoadingHomeSnapshots.set(false);
+      },
+    });
+  }
+
   private refreshAnalyticsWhenPageBecomesActive() {
+    if (this.hasRegisteredAnalyticsRefresh) {
+      return;
+    }
+
+    this.hasRegisteredAnalyticsRefresh = true;
+
     const onPageActive = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && this.isAnalyticsPage()) {
         this.loadAnalytics();
       }
     };
 
     const onFocus = () => {
-      this.loadAnalytics();
+      if (this.isAnalyticsPage()) {
+        this.loadAnalytics();
+      }
     };
 
     document.addEventListener('visibilitychange', onPageActive);
@@ -214,5 +347,79 @@ export class HomePage implements OnInit {
     const bestTotalViews = this.bestPortfolio()?.totalViews ?? 0;
 
     return bestTotalViews > 0 ? (portfolio.totalViews / bestTotalViews) * 100 : 0;
+  }
+
+  protected getSnapshotFeatureWidth(index: number): string {
+    return `${88 - index * 12}%`;
+  }
+
+  private toHomeSnapshotCard(portfolio: PortfolioPublicDto, index: number): HomeSnapshotCard {
+    const modules = this.flattenModules(portfolio.modules ?? []).filter(
+      (module) => module.type !== 'background',
+    );
+    const description = this.getSnapshotDescription(portfolio, modules);
+    const featureLines = modules
+      .map((module) => module.label?.trim())
+      .filter((label): label is string => Boolean(label))
+      .slice(0, 3);
+
+    return {
+      id: portfolio.id,
+      title: portfolio.title,
+      slug: portfolio.slug,
+      description,
+      tags: (portfolio.tags ?? []).slice(0, 3),
+      featureLines: featureLines.length > 0 ? featureLines : ['Hero', 'Contenuti', 'Pubblicazione'],
+      imageUrl: this.getSnapshotImage(modules),
+      accent: this.getSnapshotAccent(index),
+      modulesCount: modules.length,
+      placeholder: false,
+    };
+  }
+
+  private flattenModules(modules: PortfolioModuleDto[]): PortfolioModuleDto[] {
+    return modules.flatMap((module) => [module, ...this.flattenModules(module.children ?? [])]);
+  }
+
+  private getSnapshotDescription(
+    portfolio: PortfolioPublicDto,
+    modules: PortfolioModuleDto[],
+  ): string {
+    const portfolioDescription = portfolio.description?.trim();
+    if (portfolioDescription) {
+      return this.truncateSnapshotText(portfolioDescription, 124);
+    }
+
+    const textModule = modules.find((module) =>
+      ['description', 'quote', 'cta', 'title'].includes(module.type),
+    );
+    const value = textModule?.value?.trim();
+    if (value) {
+      return this.truncateSnapshotText(value, 124);
+    }
+
+    if (portfolio.tags?.length) {
+      return `Portfolio pubblico su ${portfolio.tags.slice(0, 2).join(' e ')}.`;
+    }
+
+    return 'Portfolio pubblico selezionato per comparire nella Home.';
+  }
+
+  private getSnapshotImage(modules: PortfolioModuleDto[]): string {
+    const mediaModule = modules.find(
+      (module) => module.type === 'image' || module.type === 'carousel',
+    );
+    return mediaModule?.values?.find(Boolean) ?? mediaModule?.value ?? '';
+  }
+
+  private truncateSnapshotText(value: string, limit: number): string {
+    const compactValue = value.replace(/\s+/g, ' ').trim();
+    return compactValue.length > limit
+      ? `${compactValue.slice(0, limit - 1).trim()}...`
+      : compactValue;
+  }
+
+  private getSnapshotAccent(index: number): string {
+    return ['#83d1b4', '#f7d26d', '#d87f47', '#c0efe1'][index % 4];
   }
 }

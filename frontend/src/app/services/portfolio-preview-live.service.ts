@@ -259,6 +259,7 @@ export class PortfolioPreviewLiveService {
         id: snapshot.id ?? '',
         title: snapshot.title ?? expectedSlug,
         slug: expectedSlug,
+        description: snapshot.description ?? null,
         tags: Array.isArray(snapshot.tags) ? snapshot.tags : [],
         public: snapshot.public ?? true,
         showHomeSnapshot: snapshot.showHomeSnapshot,

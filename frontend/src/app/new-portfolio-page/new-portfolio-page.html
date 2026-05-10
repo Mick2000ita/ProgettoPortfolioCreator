@@ -64,7 +64,7 @@
 
           <label class="field-block">
             <span>Nome del portfolio</span>
-            <input pInputText formControlName="title" placeholder="Es. Marco Rinaldi" />
+            <input pInputText formControlName="title" placeholder="Es. Mario Bianchi" />
           </label>
 
           @if (
@@ -79,7 +79,7 @@
             <input
               pInputText
               formControlName="slug"
-              placeholder="marco-rinaldi"
+              placeholder="mario-bianchi"
               (input)="onSlugInput()"
             />
           </label>
@@ -101,13 +101,11 @@
           @if (slugError(); as errorMessage) {
             <div class="helper-box helper-box-error">{{ errorMessage }}</div>
           } @else if (
-            portfolioForm.controls.slug.hasError('required') &&
-            portfolioForm.controls.slug.touched
+            portfolioForm.controls.slug.hasError('required') && portfolioForm.controls.slug.touched
           ) {
             <div class="helper-box helper-box-error">Lo slug e obbligatorio.</div>
           } @else if (
-            portfolioForm.controls.slug.hasError('pattern') &&
-            portfolioForm.controls.slug.touched
+            portfolioForm.controls.slug.hasError('pattern') && portfolioForm.controls.slug.touched
           ) {
             <div class="helper-box helper-box-error">
               Usa solo lettere minuscole, numeri e trattini.
@@ -332,9 +330,7 @@
               <strong>Privacy</strong>
               <span>
                 {{
-                  portfolioForm.controls.public.value
-                    ? 'Portfolio pubblico'
-                    : 'Portfolio privato'
+                  portfolioForm.controls.public.value ? 'Portfolio pubblico' : 'Portfolio privato'
                 }}
               </span>
             </article>

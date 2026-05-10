@@ -138,7 +138,7 @@ export class LoginPage {
       .subscribe({
         next: (response) => {
           this.authSessionService.saveLoginSession(response, { rememberMe });
-          void this.router.navigate(['/home']);
+          void this.router.navigate(['/analytics']);
         },
         error: (error) => {
           const detail = error?.error?.message ?? 'Credenziali non valide o utente non trovato';

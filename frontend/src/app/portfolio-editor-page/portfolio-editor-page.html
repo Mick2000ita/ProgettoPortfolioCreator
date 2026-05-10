@@ -63,6 +63,7 @@
                     [class.canvas-item-code]="nodeData.type === 'code'"
                     [class.canvas-item-image]="nodeData.type === 'image'"
                     [class.canvas-item-carousel]="nodeData.type === 'carousel'"
+                    [class.canvas-item-interpolation]="nodeData.type === 'interpolation'"
                     [class.canvas-item-table]="nodeData.type === 'table'"
                     [class.canvas-item-quote]="nodeData.type === 'quote'"
                     [class.canvas-item-stats]="nodeData.type === 'stats'"
@@ -199,6 +200,62 @@
                           } @else {
                             <div class="block-placeholder">
                               Carousel vuoto. Carica almeno due immagini per creare una sequenza.
+                            </div>
+                          }
+                        }
+
+                        @if (nodeData.type === 'interpolation') {
+                          @if (getInterpolationFramePair(nodeData); as interpolation) {
+                            <section class="interpolation-preview-card">
+                              <div class="interpolation-preview-media">
+                                <img
+                                  class="interpolation-preview-image"
+                                  [src]="interpolation.before"
+                                  alt="Immagine interpolazione iniziale"
+                                />
+                                <img
+                                  class="interpolation-preview-image interpolation-preview-image-after"
+                                  [src]="interpolation.after"
+                                  alt="Immagine interpolazione finale"
+                                  [style.opacity]="interpolation.alpha"
+                                />
+                              </div>
+
+                              @if (nodeData.images.length > 1) {
+                                <div
+                                  class="interpolation-editor-slider"
+                                  (pointerdown)="selectNode(node, $event)"
+                                >
+                                  <p-slider
+                                    styleClass="interpolation-editor-prime-slider"
+                                    ariaLabel="Interpolazione immagini"
+                                    [tabindex]="0"
+                                    [ngModel]="getInterpolationValue(nodeData)"
+                                    [min]="0"
+                                    [max]="100"
+                                    [step]="1"
+                                    (ngModelChange)="
+                                      updateNodeInterpolationNumericValue(node, $event)
+                                    "
+                                  />
+                                  <output
+                                    class="interpolation-editor-value"
+                                    aria-live="polite"
+                                    aria-label="Valore interpolazione"
+                                  >
+                                    {{ getInterpolationValueLabel(nodeData) }}
+                                  </output>
+                                  <div class="interpolation-editor-ticks" aria-hidden="true">
+                                    @for (image of nodeData.images; track $index) {
+                                      <span></span>
+                                    }
+                                  </div>
+                                </div>
+                              }
+                            </section>
+                          } @else {
+                            <div class="block-placeholder">
+                              Carica almeno due immagini per creare una interpolazione lineare.
                             </div>
                           }
                         }
@@ -526,7 +583,7 @@
           <div class="portfolio-fields" [formGroup]="portfolioForm">
             <label class="field-block">
               <span>Titolo portfolio</span>
-              <input pInputText formControlName="title" placeholder="Es. Marco Rinaldi Portfolio" />
+              <input pInputText formControlName="title" placeholder="Es. Sara Rossi Portfolio" />
             </label>
           </div>
 
@@ -744,6 +801,39 @@
               } @else {
                 <div class="helper-box">
                   Nessuna slide caricata. Aggiungi immagini per vedere l anteprima del carousel.
+                </div>
+              }
+            }
+
+            @if (selectedNode.type === 'interpolation') {
+              <label class="field-block">
+                <span>Carica immagini</span>
+                <input type="file" accept="image/*" multiple (change)="onImagesSelected($event)" />
+                <small
+                  >Servono almeno due immagini. Con piu immagini lo slider passa da una coppia alla
+                  successiva.</small
+                >
+              </label>
+
+              @if (selectedNode.images.length > 0) {
+                <div class="helper-box">
+                  {{ selectedNode.images.length }} immagini nel modulo. La barra interattiva appare
+                  nella pagina pubblica.
+                </div>
+
+                <div class="inspector-image-grid">
+                  @for (image of selectedNode.images; track image; let imageIndex = $index) {
+                    <figure class="inspector-image-card">
+                      <figcaption>Frame {{ $index + 1 }}</figcaption>
+                      <img [src]="image" alt="Preview immagine interpolazione" />
+                      <button type="button" (click)="removeImage(imageIndex)">Rimuovi</button>
+                    </figure>
+                  }
+                </div>
+              } @else {
+                <div class="helper-box">
+                  Nessuna immagine caricata. Aggiungi due o piu immagini per vedere lo slider nel
+                  canvas.
                 </div>
               }
             }

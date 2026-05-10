@@ -16,6 +16,7 @@ public class Portfolio {
     private UUID id;
     private String title;
     private String slug;
+    private String description;
     private List<String> tags;
     private List<Object> publicData;
     private List<Object> wipData;

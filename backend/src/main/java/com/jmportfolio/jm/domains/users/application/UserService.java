@@ -135,6 +135,7 @@ public class UserService {
                     latestPortfolio.getId(),
                     latestPortfolio.getTitle(),
                     latestPortfolio.getSlug(),
+                    latestPortfolio.getDescription(),
                     latestPortfolio.getTags() == null ? List.of() : latestPortfolio.getTags(),
                     latestPortfolio.isPublic(),
                     latestPortfolio.isShowHomeSnapshot(),

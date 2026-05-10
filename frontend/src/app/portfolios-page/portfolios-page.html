@@ -42,10 +42,30 @@
               <div class="portfolio-copy">
                 <strong>{{ portfolio.title }}</strong>
                 <span>/{{ portfolio.slug }}</span>
-                <p>
-                  Questo portfolio e' gia' associato al tuo account ed e' pronto per evolvere con
-                  progetti, layout e contenuti.
-                </p>
+                <div class="description-editor">
+                  <textarea
+                    [ngModel]="getDescriptionDraft(portfolio)"
+                    (ngModelChange)="updateDescriptionDraft(portfolio.slug, $event)"
+                    [disabled]="descriptionSavingSlug() === portfolio.slug"
+                    maxlength="180"
+                    rows="3"
+                    placeholder="Descrizione per Snap Home"
+                    aria-label="Descrizione portfolio per Snap Home"
+                  ></textarea>
+
+                  <button
+                    pButton
+                    type="button"
+                    class="description-save-button"
+                    icon="pi pi-check"
+                    [rounded]="true"
+                    [text]="true"
+                    [disabled]="!hasDescriptionChanges(portfolio)"
+                    [loading]="descriptionSavingSlug() === portfolio.slug"
+                    aria-label="Salva descrizione portfolio"
+                    (click)="savePortfolioDescription(portfolio)"
+                  ></button>
+                </div>
               </div>
 
               <div class="tag-editor">
@@ -74,6 +94,38 @@
                   aria-label="Salva tag portfolio"
                   (click)="savePortfolioTags(portfolio)"
                 ></button>
+              </div>
+
+              <div class="discovery-toggles" aria-label="Visibilita portfolio">
+                <label
+                  class="discovery-checkbox"
+                  [class.discovery-checkbox-active]="portfolio.showHomeSnapshot"
+                  [class.discovery-checkbox-disabled]="discoverySavingSlug() === portfolio.slug"
+                >
+                  <input
+                    type="checkbox"
+                    [checked]="portfolio.showHomeSnapshot"
+                    [disabled]="discoverySavingSlug() === portfolio.slug"
+                    (change)="toggleHomeSnapshotVisibility(portfolio)"
+                  />
+                  <span class="pi pi-home" aria-hidden="true"></span>
+                  <span>Home</span>
+                </label>
+
+                <label
+                  class="discovery-checkbox"
+                  [class.discovery-checkbox-active]="portfolio.showInExplore"
+                  [class.discovery-checkbox-disabled]="discoverySavingSlug() === portfolio.slug"
+                >
+                  <input
+                    type="checkbox"
+                    [checked]="portfolio.showInExplore"
+                    [disabled]="discoverySavingSlug() === portfolio.slug"
+                    (change)="toggleExploreVisibility(portfolio)"
+                  />
+                  <span class="pi pi-compass" aria-hidden="true"></span>
+                  <span>Esplora</span>
+                </label>
               </div>
             </div>
 

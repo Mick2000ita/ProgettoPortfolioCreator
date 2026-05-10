@@ -15,6 +15,7 @@ export type ContentType =
   | 'cv'
   | 'image'
   | 'carousel'
+  | 'interpolation'
   | 'table'
   | 'quote'
   | 'stats'
@@ -329,6 +330,12 @@ export const PORTFOLIO_EDITOR_CONTENT_OPTIONS: ContentOption[] = [
     label: 'Carousel',
     description: 'Sequenze di immagini sfogliabili per case study e gallery.',
     icon: 'pi pi-images',
+  },
+  {
+    value: 'interpolation',
+    label: 'Interpolazione',
+    description: 'Due o piu immagini miscelate da uno slider lineare.',
+    icon: 'pi pi-sliders-h',
   },
   {
     value: 'table',
@@ -1006,9 +1013,10 @@ export function buildPortfolioModulesFromTemplate(
       ? getDefaultTextStyle(slot.type)
       : undefined;
 
-    if (slot.type === 'image' || slot.type === 'carousel') {
+    if (slot.type === 'image' || slot.type === 'carousel' || slot.type === 'interpolation') {
       return {
         ...baseModule,
+        value: slot.type === 'interpolation' ? '50' : undefined,
         values: [],
       };
     }
@@ -1181,6 +1189,8 @@ export class PortfolioEditorStateService {
         return { columnStart: 1, rowStart: 1, columnSpan: 6, rowSpan: 4 };
       case 'carousel':
         return { columnStart: 1, rowStart: 1, columnSpan: 8, rowSpan: 5 };
+      case 'interpolation':
+        return { columnStart: 1, rowStart: 1, columnSpan: 8, rowSpan: 5 };
       case 'table':
         return { columnStart: 1, rowStart: 1, columnSpan: 8, rowSpan: 5 };
       case 'quote':
@@ -1219,7 +1229,7 @@ export class PortfolioEditorStateService {
       data: {
         type,
         label,
-        textValue: overrides.textValue ?? '',
+        textValue: overrides.textValue ?? (type === 'interpolation' ? '50' : ''),
         subtitle: overrides.subtitle ?? '',
         language: type === 'code' ? resolveCodeLanguage(overrides.language) : '',
         buttonLabel: overrides.buttonLabel ?? '',

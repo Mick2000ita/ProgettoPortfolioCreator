@@ -1,16 +1,16 @@
 package com.jmportfolio.jm.domains.portfolios.infrastructure.repo;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.List;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 
 import com.jmportfolio.jm.core.BaseRepository;
 import com.jmportfolio.jm.domains.portfolios.infrastructure.entities.PortfolioJpaEntity;
 
-public interface PortfolioJpaRepo extends BaseRepository<PortfolioJpaEntity, UUID>{
-    
+public interface PortfolioJpaRepo extends BaseRepository<PortfolioJpaEntity, UUID> {
+
     @EntityGraph(attributePaths = {"userJpaEntity"})
     Optional<PortfolioJpaEntity> findById(UUID id);
 
@@ -28,6 +28,9 @@ public interface PortfolioJpaRepo extends BaseRepository<PortfolioJpaEntity, UUI
 
     @EntityGraph(attributePaths = {"userJpaEntity"})
     Optional<PortfolioJpaEntity> findBySlugAndIsPublicTrue(String slug);
+
+    @EntityGraph(attributePaths = {"userJpaEntity"})
+    List<PortfolioJpaEntity> findTop4ByIsPublicTrueAndShowHomeSnapshotTrueOrderByCreatedDesc();
 
     boolean existsBySlug(String slug);
 

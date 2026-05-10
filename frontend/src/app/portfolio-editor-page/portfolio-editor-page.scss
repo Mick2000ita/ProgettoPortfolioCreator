@@ -540,7 +540,8 @@
 }
 
 .single-image-preview,
-.carousel-preview-media {
+.carousel-preview-media,
+.interpolation-preview-media {
   position: relative;
   height: 100%;
   overflow: hidden;
@@ -548,7 +549,8 @@
 }
 
 .canvas-item-image .canvas-item-body,
-.canvas-item-carousel .canvas-item-body {
+.canvas-item-carousel .canvas-item-body,
+.canvas-item-interpolation .canvas-item-body {
   align-content: stretch;
   align-items: stretch;
   grid-template-rows: minmax(0, 1fr);
@@ -556,7 +558,8 @@
 }
 
 .canvas-item-image .canvas-card,
-.canvas-item-carousel .canvas-card {
+.canvas-item-carousel .canvas-card,
+.canvas-item-interpolation .canvas-card {
   background: transparent;
   border: 0;
   backdrop-filter: none;
@@ -565,7 +568,9 @@
 
 .canvas-item-image .single-image-preview,
 .canvas-item-carousel .carousel-preview-card,
-.canvas-item-carousel .carousel-preview-media {
+.canvas-item-carousel .carousel-preview-media,
+.canvas-item-interpolation .interpolation-preview-card,
+.canvas-item-interpolation .interpolation-preview-media {
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -574,7 +579,8 @@
 }
 
 .single-image-preview img,
-.carousel-preview-media img {
+.carousel-preview-media img,
+.interpolation-preview-image {
   display: block;
   width: 100%;
   height: 100%;
@@ -583,9 +589,56 @@
 }
 
 .single-image-preview img,
-.carousel-preview-media img {
+.carousel-preview-media img,
+.interpolation-preview-image {
   position: absolute;
   inset: 0;
+}
+
+.interpolation-preview-card {
+  position: relative;
+  display: block;
+  height: 100%;
+  min-height: 100%;
+}
+
+.interpolation-editor-slider {
+  position: absolute;
+  left: 2rem;
+  right: 3.7rem;
+  bottom: 2.15rem;
+  z-index: 6;
+  padding: 0.56rem 0 0.34rem;
+}
+
+.interpolation-editor-ticks {
+  position: absolute;
+  left: 0.18rem;
+  right: 0.18rem;
+  top: 50%;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.interpolation-editor-ticks span {
+  width: 0.12rem;
+  height: 0.68rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.interpolation-editor-value {
+  position: absolute;
+  right: -2.6rem;
+  top: 50%;
+  min-width: 1.8rem;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.68rem;
+  line-height: 1;
+  text-align: right;
+  transform: translateY(-50%);
 }
 
 .inspector-image-card img {

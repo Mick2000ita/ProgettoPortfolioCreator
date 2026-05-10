@@ -5,7 +5,8 @@ export const routes: Routes = [
   {
     path: '',
     loadComponent: () => import('./home-page/home-page').then((module) => module.HomePage),
-    canActivate: [guestGuard]
+    canActivate: [guestGuard],
+    data: { page: 'landing' }
   },
   {
     path: 'login',
@@ -26,7 +27,8 @@ export const routes: Routes = [
     children: [
       {
         path: '',
-        loadComponent: () => import('./home-page/home-page').then((module) => module.HomePage)
+        loadComponent: () => import('./home-page/home-page').then((module) => module.HomePage),
+        data: { page: 'landing' }
       }
     ]
   },
@@ -38,6 +40,11 @@ export const routes: Routes = [
       ),
     canActivate: [authGuard],
     children: [
+      {
+        path: 'analytics',
+        loadComponent: () => import('./home-page/home-page').then((module) => module.HomePage),
+        data: { page: 'analytics' }
+      },
       {
         path: 'profile',
         loadComponent: () =>

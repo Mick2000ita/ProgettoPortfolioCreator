@@ -150,7 +150,7 @@ export class GoogleLoginComponent implements AfterViewInit {
             rememberMe: this.rememberMe(),
             provider: 'google'
           });
-          void this.router.navigate(['/home']);
+          void this.router.navigate(['/analytics']);
         },
         error: () => {
           this.loginError.emit('Non è stato possibile completare il login con Google');

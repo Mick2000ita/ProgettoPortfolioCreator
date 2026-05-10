@@ -18,6 +18,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TreeNode } from 'primeng/api';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
+import { SliderModule } from 'primeng/slider';
 import { TextareaModule } from 'primeng/textarea';
 import {
   AuthApiService,
@@ -106,6 +107,7 @@ type EditableTableGrid = string[][];
     InputTextModule,
     TextareaModule,
     SelectModule,
+    SliderModule,
     NgStyle,
   ],
   templateUrl: './portfolio-editor-page.html',
@@ -1142,7 +1144,9 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     const files = Array.from(inputElement.files ?? []);
     if (
       !selectedNode?.data ||
-      (selectedNode.data.type !== 'image' && selectedNode.data.type !== 'carousel') ||
+      (selectedNode.data.type !== 'image' &&
+        selectedNode.data.type !== 'carousel' &&
+        selectedNode.data.type !== 'interpolation') ||
       files.length === 0
     ) {
       return;
@@ -1169,7 +1173,9 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     const selectedNode = this.selectedTreeNode();
     if (
       !selectedNode?.data ||
-      (selectedNode.data.type !== 'image' && selectedNode.data.type !== 'carousel')
+      (selectedNode.data.type !== 'image' &&
+        selectedNode.data.type !== 'carousel' &&
+        selectedNode.data.type !== 'interpolation')
     ) {
       return;
     }
@@ -1180,9 +1186,83 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     this.refreshSelectedNode(selectedNode.key ?? null);
   }
 
+  protected getInterpolationValue(nodeData: EditorNodeData) {
+    return this.clampNumber(Number.parseFloat(nodeData.textValue), 0, 100, 50);
+  }
+
+  protected getInterpolationFramePair(nodeData: EditorNodeData) {
+    const images = nodeData.images;
+    if (images.length === 0) {
+      return null;
+    }
+
+    if (images.length === 1) {
+      return {
+        before: images[0],
+        after: images[0],
+        alpha: 0,
+        beforeIndex: 0,
+        afterIndex: 0,
+      };
+    }
+
+    const value = this.getInterpolationValue(nodeData);
+    const scaledValue = (value / 100) * (images.length - 1);
+    const beforeIndex = Math.floor(scaledValue);
+    const afterIndex = Math.min(beforeIndex + 1, images.length - 1);
+
+    return {
+      before: images[beforeIndex],
+      after: images[afterIndex],
+      alpha: scaledValue - beforeIndex,
+      beforeIndex,
+      afterIndex,
+    };
+  }
+
+  protected updateNodeInterpolationValue(node: TreeNode<EditorNodeData>, event: Event) {
+    this.updateNodeInterpolationNumericValue(
+      node,
+      Number.parseFloat((event.target as HTMLInputElement).value),
+    );
+  }
+
+  protected updateNodeInterpolationNumericValue(
+    node: TreeNode<EditorNodeData>,
+    value: number | null | undefined,
+  ) {
+    if (!node.data || node.data.type !== 'interpolation') {
+      return;
+    }
+
+    node.data.textValue = String(this.clampNumber(value ?? Number.NaN, 0, 100, 50));
+    this.refreshSelectedNode(node.key ?? null);
+  }
+
+  protected updateSelectedInterpolationValue(event: Event) {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode) {
+      return;
+    }
+
+    this.updateNodeInterpolationValue(selectedNode, event);
+  }
+
+  protected updateSelectedInterpolationNumericValue(value: number | null | undefined) {
+    const selectedNode = this.selectedTreeNode();
+    if (!selectedNode) {
+      return;
+    }
+
+    this.updateNodeInterpolationNumericValue(selectedNode, value);
+  }
+
   protected moveImage(imageIndex: number, direction: -1 | 1) {
     const selectedNode = this.selectedTreeNode();
-    if (!selectedNode?.data || selectedNode.data.type !== 'carousel') {
+    if (
+      !selectedNode?.data ||
+      (selectedNode.data.type !== 'carousel' && selectedNode.data.type !== 'interpolation')
+    ) {
       return;
     }
 
@@ -1417,7 +1497,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
 
         return this.portfolioEditorStateService.createTreeNode(normalizedType, {
           label: module.label || this.getContentTypeLabel(normalizedType),
-          textValue: module.value ?? '',
+          textValue: module.value ?? (normalizedType === 'interpolation' ? '50' : ''),
           subtitle: module.subtitle ?? '',
           language: resolveCodeLanguage(module.language),
           buttonLabel: module.buttonLabel ?? '',
@@ -1475,6 +1555,14 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
         if (data.type === 'carousel') {
           return {
             ...baseModule,
+            values: [...data.images],
+          };
+        }
+
+        if (data.type === 'interpolation') {
+          return {
+            ...baseModule,
+            value: String(this.getInterpolationValue(data)),
             values: [...data.images],
           };
         }
@@ -1700,6 +1788,8 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
         return { columnStart: 22, rowStart: 12, columnSpan: 18, rowSpan: 16 };
       case 'carousel':
         return { columnStart: 19, rowStart: 12, columnSpan: 22, rowSpan: 18 };
+      case 'interpolation':
+        return { columnStart: 19, rowStart: 12, columnSpan: 22, rowSpan: 18 };
       case 'table':
         return { columnStart: 5, rowStart: 20, columnSpan: 22, rowSpan: 14 };
       case 'quote':
@@ -1732,9 +1822,13 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
             ? 14
             : type === 'share'
               ? 10
-            : type === 'quote' || type === 'stats' || type === 'carousel' || type === 'code'
-              ? 12
-              : 10;
+              : type === 'quote' ||
+                  type === 'stats' ||
+                  type === 'carousel' ||
+                  type === 'interpolation' ||
+                  type === 'code'
+                ? 12
+                : 10;
     const minRowSpan =
       type === 'background'
         ? 1
@@ -1744,11 +1838,11 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
             ? 4
             : type === 'share'
               ? 4
-            : type === 'quote' || type === 'stats' || type === 'code'
-              ? 6
-              : type === 'image'
-                ? 10
-                : 8;
+              : type === 'quote' || type === 'stats' || type === 'code'
+                ? 6
+                : type === 'image'
+                  ? 10
+                  : 8;
     const columnSpan = this.clampInteger(
       layout?.columnSpan,
       minColumnSpan,
@@ -1860,6 +1954,7 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
       type === 'code' ||
       type === 'image' ||
       type === 'carousel' ||
+      type === 'interpolation' ||
       type === 'table' ||
       type === 'quote' ||
       type === 'stats' ||
@@ -1889,6 +1984,11 @@ export class PortfolioEditorPage implements OnInit, OnDestroy {
     const normalizedValue =
       typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : fallback;
 
+    return Math.min(max, Math.max(min, normalizedValue));
+  }
+
+  private clampNumber(value: number, min: number, max: number, fallback: number) {
+    const normalizedValue = Number.isFinite(value) ? value : fallback;
     return Math.min(max, Math.max(min, normalizedValue));
   }
 

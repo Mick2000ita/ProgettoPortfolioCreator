@@ -53,6 +53,13 @@ public class PortfolioRepository {
                 .map(PortfolioJpaMapper::entityToModel);
     }
 
+    public List<Portfolio> findHomeSnapshotPortfolios() {
+        return portfolioJpaRepo.findTop4ByIsPublicTrueAndShowHomeSnapshotTrueOrderByCreatedDesc()
+                .stream()
+                .map(PortfolioJpaMapper::entityToModel)
+                .toList();
+    }
+
     public Optional<Portfolio> findById(UUID id) {
         return portfolioJpaRepo.findById(id).map(PortfolioJpaMapper::entityToModel);
     }

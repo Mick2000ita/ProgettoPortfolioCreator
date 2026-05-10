@@ -38,6 +38,7 @@
               [class.public-node-code]="module.type === 'code'"
               [class.public-node-image]="module.type === 'image'"
               [class.public-node-carousel]="module.type === 'carousel'"
+              [class.public-node-interpolation]="module.type === 'interpolation'"
               [class.public-node-table]="module.type === 'table'"
               [class.public-node-quote]="module.type === 'quote'"
               [class.public-node-stats]="module.type === 'stats'"
@@ -128,6 +129,71 @@
                   </section>
                 } @else {
                   <div class="module-placeholder">Carousel senza immagini.</div>
+                }
+              }
+
+              @if (module.type === 'interpolation') {
+                @if (getInterpolationFramePair(module, moduleIndex); as interpolation) {
+                  <section
+                    class="public-interpolation-shell"
+                    [class.public-interpolation-shell-pulse]="interpolationHintPulse()"
+                  >
+                    <div class="public-interpolation-media" #interpolationMedia>
+                      <img
+                        class="public-interpolation-image"
+                        [src]="interpolation.before"
+                        alt="Immagine interpolazione iniziale"
+                        (load)="
+                          updateInterpolationMediaWidth(
+                            module,
+                            moduleIndex,
+                            interpolationMedia,
+                            $event
+                          )
+                        "
+                      />
+                      <img
+                        class="public-interpolation-image public-interpolation-image-after"
+                        [src]="interpolation.after"
+                        alt="Immagine interpolazione finale"
+                        [style.opacity]="interpolation.alpha"
+                      />
+
+                      @if ((module.values?.length ?? 0) > 1) {
+                        <div class="public-interpolation-hover-hint" aria-hidden="true">
+                          <i class="pi pi-sliders-h"></i>
+                          <span>Passa sopra</span>
+                        </div>
+                      }
+                    </div>
+
+                    @if ((module.values?.length ?? 0) > 1) {
+                      <div
+                        class="public-interpolation-slider"
+                        [style.--public-interpolation-image-width]="
+                          getInterpolationImageWidth(module, moduleIndex)
+                        "
+                      >
+                        <div class="public-interpolation-track">
+                          <p-slider
+                            styleClass="public-interpolation-prime-slider"
+                            [ngModel]="getInterpolationValue(module, moduleIndex)"
+                            [min]="0"
+                            [max]="100"
+                            [step]="1"
+                            (ngModelChange)="updateInterpolationValue(module, moduleIndex, $event)"
+                          />
+                          <div class="public-interpolation-ticks" aria-hidden="true">
+                            @for (image of module.values; track $index) {
+                              <span></span>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    }
+                  </section>
+                } @else {
+                  <div class="module-placeholder">Interpolazione senza immagini.</div>
                 }
               }
 
